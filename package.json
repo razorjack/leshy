@@ -12,6 +12,7 @@
     "test": "vp test",
     "check": "vp check && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.node.json",
     "spike": "node scripts/spike/run.ts",
+    "test:e2e": "playwright test",
     "models:fetch": "node scripts/fetch-model.ts",
     "icons": "node scripts/icons.ts",
     "prepare": "vp config"

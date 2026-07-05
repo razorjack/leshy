@@ -83,8 +83,10 @@ export default defineConfig({
     rules: { "vite-plus/prefer-vite-plus-imports": "error" },
     options: { typeAware: true, typeCheck: true },
     // generated shadcn-svelte barrels re-export named symbols from .svelte
-    // modules, which tsgolint cannot see; svelte-check owns those files
-    ignorePatterns: ["src/lib/components/ui/**"],
+    // modules, which tsgolint cannot see; svelte-check owns those files.
+    // e2e/ + playwright.config.ts import @playwright/test, an intentionally
+    // uninstalled dev-only dependency (step 17, adr/0006).
+    ignorePatterns: ["src/lib/components/ui/**", "e2e/**", "playwright.config.ts"],
   },
   staged: { "*.{js,ts,svelte,css}": "vp check --fix" },
 });
