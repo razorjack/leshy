@@ -106,6 +106,25 @@ console.log(
     : `scrub: ${scrubFail} failures`,
 );
 
+// Chunking (adr/0003): a 5k-word log with the same name at the start, a window
+// seam, the middle and the end — every occurrence must be caught and scrubbed.
+console.log("\n=== chunking (5k-word input) ===");
+const words = "the transaction was processed ".repeat(1250).trim().split(" ");
+for (const p of [3, 249, 2500, 4990]) {
+  words[p] = "Jan";
+  words[p + 1] = "Kowalski";
+}
+const bigLog = words.join(" ");
+const expected = (bigLog.match(/Jan Kowalski/g) ?? []).length;
+const bigOut = (await scrub(bigLog, { config, semantic })).output;
+const survived = (bigOut.match(/Jan Kowalski/g) ?? []).length;
+if (survived > 0) {
+  console.log(`  [CHUNK] ${survived}/${expected} occurrences survived scrub`);
+  scrubFail++;
+} else {
+  console.log(`chunking: all ${expected} occurrences across windows caught`);
+}
+
 const pass =
   full.full === goldCount &&
   full.partial === 0 &&
