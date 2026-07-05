@@ -24,19 +24,26 @@ const hash32 = (str: string): number => {
  * Builds the per-span derivation context. `personSeed` is span-independent
  * (keyed only on salt + token sequence) so a person name and an email local
  * part sharing tokens derive one identity (adr/0002 linked identities).
+ *
+ * `retry` reseeds every derivation on a collision or charset violation
+ * (adr/0002): the engine bumps it until the fake is free. It changes personSeed
+ * too, so even person/email fakes make progress — at the cost of breaking their
+ * linkage for that one colliding value (an accepted collision consequence).
  */
 export const makeContext = async (
   original: string,
   type: EntityType,
   salt: string,
+  retry = 0,
 ): Promise<GenerateContext> => {
   const normalized = normalise(original, type);
-  const seed = await deriveSeed(salt, type, normalized);
+  const tag = retry > 0 ? `:retry:${retry}` : "";
+  const seed = await deriveSeed(salt, `${type}${tag}`, normalized);
   return {
     original,
     normalized,
     seed,
     seedFor: (scope) => hash32(`${seed}:${scope}`),
-    personSeed: (tokens) => hash32(`${salt}:person:${tokens.join(" ")}`),
+    personSeed: (tokens) => hash32(`${salt}:person:${tokens.join(" ")}${tag}`),
   };
 };

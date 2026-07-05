@@ -1,9 +1,10 @@
-import type { ScrubResult, Span } from "./types.ts";
+import type { Detector, Replacement, ScrubResult, Span } from "./types.ts";
 import type { ResolvedConfig } from "./config.ts";
 import { scanKeyValues } from "./detect/keyContext.ts";
 import { detectByKey } from "./detect/keyContext.ts";
 import { detectStructural } from "./detect/structural.ts";
 import { resolve } from "./detect/resolve.ts";
+import { makeContext } from "./generate/context.ts";
 
 export interface EngineContext {
   config: ResolvedConfig;
@@ -27,26 +28,61 @@ export const detect = async (input: string, ctx: EngineContext): Promise<Span[]>
   return resolve(raw, input, detectors, ctx.config.preserve, kvs);
 };
 
+// Generator output may never contain these — they would corrupt the surrounding
+// JSON/Ruby/log structure the user copies out (adr/0002). Violations reseed.
+const FORBIDDEN = /["'\\\n\r]/;
+const MAX_RETRIES = 8;
+
 /**
- * TODO(opus): docs/implementation-plan.md steps 8–11. Contract:
- *
- * 1. `await detect(input, ctx)` — spans arrive non-overlapping, sorted.
- * 2. For each span, derive the deterministic seed via generate/derive.ts
- *    (normalise → SHA-256(salt : type-scope : normalized) → uint32) and call
- *    the owning detector's `generate(ctx)`.
- * 3. Enforce generator output constraints: no quotes/backslashes/newlines, no
- *    two distinct normalised sources sharing one fake within this run (bump
- *    the seed scope with a counter until free).
- * 4. Splice fakes into the input left-to-right, tracking the output-coordinate
- *    ranges for each replacement (bytes outside spans must survive verbatim).
- * 5. Return { output, replacements } — replacements power the UI highlights.
- *
- * Idempotence: scrub(scrub(x)) === scrub(x) for structured types via the
- * fake-namespace preserve rules; for person/address/org it holds within a run
- * (adr/0002 documents the cross-run limitation).
+ * Detect → derive → generate → splice. Fakes are spliced left-to-right; bytes
+ * outside a span survive verbatim (byte fidelity, adr/0003). Within a run a
+ * fake→source map guarantees the same value maps to one fake and two distinct
+ * values never collide (reseeding via `:retry:n` on collision or charset
+ * violation). Idempotence per adr/0002: structured types via fake-namespace
+ * preserve rules; person/address/org within a run.
  */
-export const scrub = (input: string, ctx: EngineContext): Promise<ScrubResult> => {
-  void input;
-  void ctx;
-  throw new Error("scrub() not implemented — docs/implementation-plan.md step 8");
+export const scrub = async (input: string, ctx: EngineContext): Promise<ScrubResult> => {
+  const spans = await detect(input, ctx);
+  const salt = ctx.config.salt;
+  const byId = new Map<string, Detector>(ctx.config.detectors.map((d) => [d.id, d]));
+  const used = new Map<string, string>(); // fake → normalised source that owns it
+
+  const replacements: Replacement[] = [];
+  let output = "";
+  let cursor = 0;
+
+  for (const span of spans) {
+    const detector = byId.get(span.detector);
+    if (!detector) continue;
+
+    let gctx = await makeContext(span.text, span.type, salt);
+    const normalized = gctx.normalized;
+    let fake = detector.generate(gctx);
+    const free = (f: string): boolean => {
+      const owner = used.get(f);
+      return !FORBIDDEN.test(f) && (owner === undefined || owner === normalized);
+    };
+    for (let retry = 1; retry <= MAX_RETRIES && !free(fake); retry++) {
+      gctx = await makeContext(span.text, span.type, salt, retry);
+      fake = detector.generate(gctx);
+    }
+    used.set(fake, normalized);
+
+    output += input.slice(cursor, span.start);
+    const start = output.length;
+    output += fake;
+    replacements.push({
+      start,
+      end: output.length,
+      sourceStart: span.start,
+      sourceEnd: span.end,
+      fake,
+      type: span.type,
+      detector: span.detector,
+      label: detector.label,
+    });
+    cursor = span.end;
+  }
+  output += input.slice(cursor);
+  return { output, replacements };
 };
