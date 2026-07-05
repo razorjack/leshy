@@ -3,15 +3,17 @@
   import InputPane from '$lib/components/InputPane.svelte'
   import OutputPane from '$lib/components/OutputPane.svelte'
   import ThemeToggle from '$lib/components/ThemeToggle.svelte'
+  import SettingsDialog from '$lib/components/SettingsDialog.svelte'
   import { session } from './state/session.svelte.ts'
 </script>
 
-<!-- TODO(opus): docs/implementation-plan.md steps 12–15 — wire panes to the
-     scrub worker via session, add the settings dialog and the copy flow. -->
 <div class="flex min-h-svh flex-col">
   <header class="flex items-center justify-between border-b border-border px-6 py-3">
     <Wordmark />
-    <ThemeToggle />
+    <div class="flex items-center gap-2">
+      <SettingsDialog />
+      <ThemeToggle />
+    </div>
   </header>
 
   <main class="grid flex-1 gap-px bg-border md:grid-cols-2">
