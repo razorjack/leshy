@@ -9,7 +9,7 @@
 
 <div class="flex min-h-svh flex-col">
   <header class="flex items-center justify-between border-b border-border px-6 py-3">
-    <Wordmark />
+    <Wordmark scanning={session.stage === 'working' || session.stage === 'loading-model'} />
     <div class="flex items-center gap-2">
       <SettingsDialog />
       <ThemeToggle />
@@ -21,7 +21,16 @@
     <OutputPane />
   </main>
 
-  <footer class="border-t border-border px-6 py-2 text-xs text-muted-foreground">
-    <p>Runs entirely in this tab — nothing leaves the woods. {session.stage}</p>
+  <footer
+    class="flex items-center justify-between border-t border-border px-6 py-2 text-xs text-muted-foreground"
+  >
+    <p>Runs entirely in this tab — nothing leaves the woods.</p>
+    {#if session.stage === 'loading-model'}
+      <span>Loading model…</span>
+    {:else if session.stage === 'working'}
+      <span>Scanning…</span>
+    {:else if session.stage === 'error'}
+      <span class="text-destructive">{session.error}</span>
+    {/if}
   </footer>
 </div>
