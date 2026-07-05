@@ -1,6 +1,8 @@
+/// <reference types="node" />
+// (Self-typing: the per-file staged `vp check` doesn't apply tsconfig.node.json.)
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { detect } from "../../src/core/engine.ts";
+import { detect, scrub } from "../../src/core/engine.ts";
 import { resolveConfig } from "../../src/core/config.ts";
 import { detectSemantic } from "../../src/core/detect/semantic/detect.ts";
 import { models, DEFAULT_MODEL } from "../../src/core/detect/semantic/models.ts";
@@ -66,7 +68,49 @@ console.log(
   `avg detect latency: ${(totalMs / (samples.length + hardSamples.length)).toFixed(0)}ms/sample`,
 );
 
+console.log("\n=== scrub pass (full pipeline) ===");
+let scrubFail = 0;
+for (const sample of [...samples, ...hardSamples]) {
+  const r = await scrub(sample.input, { config, semantic });
+  for (const g of sample.gold) {
+    if (g.expect === "catch" && r.output.includes(g.text)) {
+      console.log(`  [LEAK    ] ${sample.name}: "${g.text}" survived scrub`);
+      scrubFail++;
+    }
+    if (g.expect === "preserve" && !r.output.includes(g.text)) {
+      console.log(`  [PRESERVE] ${sample.name}: "${g.text}" did not survive`);
+      scrubFail++;
+    }
+  }
+}
+
+// Idempotence for namespace-fixed structured content (adr/0002): a second pass
+// must be a no-op. Semantic types (person/address/org) are excluded — they are
+// only within-run idempotent by design.
+const structured =
+  'email=jan@corp.com ip=8.8.8.8 ssn=123-45-6789 pesel=44051401359 mac="00:1B:44:11:3A:B7"';
+for (const [label, input] of [
+  ["structured", structured],
+  ["logfmt", samples[4]!.input],
+] as const) {
+  const once = await scrub(input, { config, semantic });
+  const twice = await scrub(once.output, { config, semantic });
+  if (once.output !== twice.output) {
+    console.log(`  [IDEMPOTENCE] ${label}: re-scrub changed the output`);
+    scrubFail++;
+  }
+}
+console.log(
+  scrubFail === 0
+    ? "scrub: no leaks, preserves intact, idempotent"
+    : `scrub: ${scrubFail} failures`,
+);
+
 const pass =
-  full.full === goldCount && full.partial === 0 && full.miss === 0 && full.preserveViolations === 0;
+  full.full === goldCount &&
+  full.partial === 0 &&
+  full.miss === 0 &&
+  full.preserveViolations === 0 &&
+  scrubFail === 0;
 console.log(pass ? "\nPASS" : "\nFAIL");
 process.exit(pass ? 0 : 1);

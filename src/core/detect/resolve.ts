@@ -108,8 +108,12 @@ export const resolve = (
     input,
   );
 
-  // fake-namespace values (Leshy's own output) are preserved above everything
-  spans = spans.filter((s) => !activePreserve.some((r) => r.isFake?.(s.text)));
+  // Fake-namespace values (Leshy's own output) define preserve regions, not
+  // just self-drops: the whole matched span is protected so a re-scrub is a
+  // no-op even when the model tags a fragment of a fake (a fake email's local
+  // part reads as a person/org). This is what makes idempotence hold (adr/0002).
+  const fakeRegions = spans.filter((s) => activePreserve.some((r) => r.isFake?.(s.text)));
+  spans = spans.filter((s) => !fakeRegions.some((f) => overlaps(s, f)));
 
   // preserve rules beat everything below TIER.VALIDATED
   spans = spans.filter(
