@@ -46,6 +46,15 @@ Status: accepted
 5. **oxfmt** owns formatting (double quotes, semicolons) — never argue with it, run
    `vp check --fix`.
 6. `@faker-js/faker` is **pinned exactly** — see ADR-0002.
+7. **Per-file `vp check` (the staged pre-commit hook) does not apply
+   `tsconfig.node.json`.** A node script checked in isolation loses its `types: ["node"]`,
+   so `process`/`node:*` fail to resolve — `scripts/spike/run.ts` carries a
+   `/// <reference types="node" />` to self-type. The project gate `npm run check` (which
+   runs `tsc -p tsconfig.node.json`) is authoritative for the scripts.
+8. **The e2e smoke test (`e2e/`, `playwright.config.ts`) is authored but Playwright is
+   NOT installed** — the no-new-deps rule. Those paths are in `lint.ignorePatterns` and
+   outside both tsconfig includes so the build stays green. To run `npm run test:e2e`:
+   `npm i -D @playwright/test && npx playwright install` first.
 
 ## Alternatives rejected
 

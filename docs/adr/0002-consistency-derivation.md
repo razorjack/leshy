@@ -79,3 +79,21 @@ n values in a paste; the alternative is a persistent registry, rejected below).
 - Generators must be pure functions of (seed, source shape); anything time- or
   locale-environment-dependent is a bug.
 - Golden-file tests can assert exact output bytes for the default salt.
+
+### Implementation notes (plan steps 1–6 — deviations from the scaffold)
+
+- **Sub-scope seeds are a synchronous mixer, not SHA-256.** The primary `ctx.seed` is the
+  SHA-256 derivation above (async, `crypto.subtle`), but the `GenerateContext` contract
+  makes `seedFor(scope)` and `personSeed(tokens)` **synchronous**, so they use a fast
+  deterministic FNV-1a mix (`generate/context.ts`) instead. It is not a security input —
+  it only decorrelates independent draws — and every required property (determinism,
+  salt-decorrelation, no storage, person↔email linkage) still holds.
+- **Collision retry perturbs `personSeed` too.** Reseeding via `:retry:n` (on a charset
+  violation or a within-run fake collision) changes `personSeed`, so a colliding person
+  and their linked email may lose linkage for that one value. This is the collision
+  consequence already accepted above ("a collision victim may differ"), traded for
+  guaranteed loop termination.
+- **Person locale from the value alone.** The `GenerateContext` exposes only the matched
+  value, so the person generator picks its locale from the value's own diacritics/shape,
+  not surrounding context. A diacritic-free Polish name (`Jan Kowalski`) therefore gets an
+  `en` fake — linkage, not Polishness, is the invariant the fixtures assert.

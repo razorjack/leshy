@@ -59,3 +59,20 @@ The ordering encodes the policy questions:
   corroboration keys off detector declarations, not hardcoded type lists).
 - The spike (`npm run spike`) locks all of this behaviour: 22/22 catches, 0 preserve
   violations, both with and without key hints.
+
+### Implementation notes (plan steps 3, 7 — deviations from the scaffold)
+
+- **Fake values define preserve _regions_, not self-drops.** `resolve.ts` originally
+  filtered out only the spans whose own text matched an `isFake` rule. That left a gap:
+  the semantic model, on a second scrub, tags a fragment _inside_ a fake (a fake email's
+  local part reads as a person/org). Since the email span is dropped as fake, that model
+  span survived and got re-scrubbed — breaking idempotence and corrupting the fake. Now
+  any span overlapping a fake-namespace span is dropped, so a fake's whole extent is
+  inert on re-scrub. This is what makes `scrub(scrub(x)) === scrub(x)` hold with the
+  model on (asserted in the spike's scrub pass).
+- **`fake-mac` and `fake-ipv6` preserve rules added** to complete the idempotence
+  namespaces ADR-0002 already names. Accepted recall cost, per ADR-0002's namespace
+  choice: a _real_ locally-administered MAC (second nibble 2/6/A/E) under a MAC key is
+  preserved rather than scrubbed. Universally-administered MACs (the common case) are
+  unaffected; the `2001:db8::/32` IPv6 range is documentation-only, so no real value is
+  ever preserved by `fake-ipv6`.

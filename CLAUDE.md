@@ -6,9 +6,13 @@ same text back with every piece of PII replaced by a stable, realistic fake, rep
 tokens subtly highlighted → copy it out. Named for the Slavic forest spirit that watches
 over everything in its woods. Tagline: **"Nothing leaves the woods."**
 
-**Status**: scaffolded + detection validated. Implement by executing
-`docs/implementation-plan.md` top to bottom. All decisions are made (`docs/adr/`); do not
-re-decide, do not ask.
+**Status**: implemented (plan steps 1–18 complete). Detection + generation + scrub are
+built and validated: `npm run check` + `npm run test` (unit + gold fixtures) green,
+`npm run spike` PASS (22/22 detection, scrub leak/preserve/idempotence/chunking). UI, the
+in-worker model, PWA/offline wiring, settings, theming are in place; a checklist of
+browser-only QA (PWA install, offline reload, visual theme) lives in the final report.
+Decisions remain fixed (`docs/adr/`); deviations from the scaffold are recorded in the
+relevant ADR Consequences sections — do not re-decide.
 
 ## Invariants (violating any of these is a bug, not a trade-off)
 
