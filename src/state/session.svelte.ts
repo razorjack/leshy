@@ -68,7 +68,9 @@ class Session {
     this.error = undefined;
     this.stage = "working";
     try {
-      const result = await worker.scrub(value, this.overrides);
+      // $state proxies aren't structured-cloneable; snapshot to a plain object
+      // before it crosses the worker boundary (postMessage).
+      const result = await worker.scrub(value, $state.snapshot(this.overrides));
       if (token !== this.token) return; // superseded by a newer request
       this.output = result.output;
       this.replacements = result.replacements;
