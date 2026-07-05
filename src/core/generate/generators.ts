@@ -1,5 +1,5 @@
 import type { Generate } from "../types.ts";
-import { fakerFor, type Locale } from "./faker.ts";
+import { fakerFor, localeFor, type Locale } from "./faker.ts";
 import { nameTokens } from "./derive.ts";
 
 /**
@@ -218,6 +218,55 @@ const apiKey: Generate = (ctx) => {
 
 const uuid: Generate = (ctx) => fakerFor(ctx.seed, "en").string.uuid();
 
+/** Reproduce the source word's casing on a faked word. */
+const matchCase = (fake: string, src: string): string => {
+  if (src.length > 0 && src === src.toUpperCase() && src !== src.toLowerCase()) {
+    return fake.toUpperCase();
+  }
+  if (src === src.toLowerCase()) return fake.toLowerCase();
+  return fake; // Titlecase / mixed → faker's default titlecase
+};
+
+const person: Generate = (ctx) => {
+  const locale = localeFor(ctx.original);
+  const seed = ctx.personSeed(nameTokens(ctx.original) ?? [ctx.normalized]);
+  const { first, last } = personParts(seed, locale); // first two draws link to email
+  const words = ctx.original.split(/\s+/).filter(Boolean);
+  let names: string[];
+  if (words.length <= 1) names = [first];
+  else if (words.length === 2) names = [first, last];
+  else {
+    const mids = Array.from({ length: words.length - 2 }, (_, k) =>
+      fakerFor(ctx.seedFor(`mid:${k}`), locale).person.firstName(),
+    );
+    names = [first, ...mids, last];
+  }
+  return names.map((n, i) => matchCase(n, words[i] ?? "")).join(" ");
+};
+
+const address: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, localeFor(ctx.original));
+  if (localeFor(ctx.original) === "pl") {
+    return `${f.location.streetAddress()}, ${f.location.zipCode()} ${f.location.city()}`;
+  }
+  return `${f.location.streetAddress()}, ${f.location.city()}, ${f.location.state({ abbreviated: true })} ${f.location.zipCode()}`;
+};
+
+// Legal suffixes kept verbatim; only the company name is faked (adr/0002).
+const ORG_SUFFIX =
+  /\s+(Sp\.\s*z\s*o\.\s*o\.|S\.A\.|Sp\.\s*j\.|Sp\.\s*k\.|GmbH|AG|Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|B\.V\.|Oy|AB|Pty\s+Ltd\.?)\s*$/i;
+// Faker often appends its own suffix; strip it so we don't double up.
+const FAKER_SUFFIX =
+  /[,\s]+(?:Sp\.?\s*z\s*o\.?\s*o\.?|z\s*o\.?\s*o\.?|S\.?A\.?|GmbH|AG|Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|Group|and\s+Sons)\s*$/i;
+
+const org: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, localeFor(ctx.original));
+  const m = ctx.original.match(ORG_SUFFIX);
+  const suffix = m ? m[1] : "";
+  const base = f.company.name().replace(FAKER_SUFFIX, "").trim() || f.person.lastName();
+  return suffix ? `${base} ${suffix}` : base;
+};
+
 export const generators = {
   email,
   ipv4,
@@ -231,4 +280,7 @@ export const generators = {
   jwt,
   "api-key": apiKey,
   uuid,
+  person,
+  address,
+  org,
 } satisfies Record<string, Generate>;

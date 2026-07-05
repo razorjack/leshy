@@ -1,5 +1,5 @@
 import type { SemanticDetector } from "../../types.ts";
-import { todoGenerate } from "../../generate/todo.ts";
+import { generators } from "../../generate/generators.ts";
 
 export const org: SemanticDetector = {
   id: "org",
@@ -9,5 +9,5 @@ export const org: SemanticDetector = {
   enabled: true,
   labels: ["organization"],
   keys: /company|organi[sz]ation|employer/i,
-  generate: todoGenerate("org"),
+  generate: generators.org,
 };

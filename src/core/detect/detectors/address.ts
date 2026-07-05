@@ -1,5 +1,5 @@
 import type { SemanticDetector, StructuralDetector } from "../../types.ts";
-import { todoGenerate } from "../../generate/todo.ts";
+import { generators } from "../../generate/generators.ts";
 
 export const address: SemanticDetector = {
   id: "address",
@@ -9,7 +9,7 @@ export const address: SemanticDetector = {
   enabled: true,
   labels: ["address", "location"],
   keys: /address|street|(?:^|_)city$|zip|post_?code|postal/i,
-  generate: todoGenerate("address"),
+  generate: generators.address,
 };
 
 // Deterministic safety net for Polish street addresses — costs nothing and
@@ -23,5 +23,5 @@ export const plAddress: StructuralDetector = {
   enabled: true,
   match:
     /\b(?:ul|al|os|pl)\.\s*\p{Lu}[\p{L}0-9. ]*?\s\d+[a-zA-Z]?(?:\/\d+[a-zA-Z]?)?(?:,\s*\d{2}-\d{3}\s+\p{Lu}\p{L}+)?/gu,
-  generate: todoGenerate("pl-address"),
+  generate: generators.address,
 };

@@ -152,3 +152,45 @@ describe("shape-preserving digit generators", () => {
     );
   });
 });
+
+describe("semantic generators", () => {
+  const wc = (s: string): number => s.split(/\s+/).filter(Boolean).length;
+
+  it("person preserves word count and casing", async () => {
+    expect(wc(await fakeOf("person", "Jan", "person"))).toBe(1);
+    expect(wc(await fakeOf("person", "Jan Kowalski", "person"))).toBe(2);
+    expect(wc(await fakeOf("person", "Anna Maria Nowak", "person"))).toBe(3);
+    const upper = await fakeOf("person", "JAN KOWALSKI", "person");
+    expect(upper).toBe(upper.toUpperCase());
+  });
+
+  it("address uses the pl shape in Polish contexts, en shape otherwise", async () => {
+    const pl = await fakeOf("address", "ul. Piękna 12/4, 00-001 Warszawa", "address");
+    expect(pl).toMatch(/,\s\d{2}-\d{3}\s/); // DD-DDD postcode
+    const en = await fakeOf("address", "123 Main Street, Springfield", "address");
+    expect(en).not.toMatch(/\d{2}-\d{3}/);
+  });
+
+  it("org keeps the legal suffix verbatim, fakes the name", async () => {
+    const pl = await fakeOf("org", "Acme Sp. z o.o.", "org");
+    expect(pl.endsWith("Sp. z o.o.")).toBe(true);
+    expect(pl).not.toContain("Acme");
+    expect((await fakeOf("org", "Beispiel GmbH", "org")).endsWith("GmbH")).toBe(true);
+    expect((await fakeOf("org", "Widgets Inc.", "org")).endsWith("Inc.")).toBe(true);
+  });
+
+  it("links a person to their email (same personSeed ⇒ shared first/last)", async () => {
+    const person = await fakeOf("person", "Jan Kowalski", "person");
+    const emailLocal = (await fakeOf("email", "jan.kowalski@gmail.com", "email")).split("@")[0]!;
+    const [first, last] = person.toLowerCase().split(" ");
+    expect(emailLocal).toContain(first!);
+    expect(emailLocal).toContain(last!);
+  });
+
+  it("is deterministic (fixed salt ⇒ exact strings)", async () => {
+    expect(await fakeOf("person", "Jan Kowalski", "person")).toBe("Shelley Stiedemann");
+    expect(await fakeOf("org", "Acme Sp. z o.o.", "org")).toBe(
+      "Simonis, Skiles and Gusikowski Sp. z o.o.",
+    );
+  });
+});
