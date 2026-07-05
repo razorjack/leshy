@@ -1,15 +1,23 @@
 <script lang="ts">
-  // TODO(opus): implementation-plan.md step 14 — respect prefers-color-scheme
-  // on first load, persist the override in localStorage('leshy-theme').
-  const toggle = () => {
-    document.documentElement.classList.toggle('dark')
-  }
+  import { Moon, Sun } from '@lucide/svelte'
+  import { currentTheme, toggleTheme, type Theme } from '../theme.ts'
+
+  // initTheme() (main.ts) has already applied the class before mount.
+  let theme = $state<Theme>('light')
+  $effect(() => {
+    theme = currentTheme()
+  })
 </script>
 
 <button
   type="button"
-  class="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
-  onclick={toggle}
+  class="rounded-md border border-border px-2.5 py-1 text-muted-foreground hover:text-foreground"
+  aria-label="Toggle theme"
+  onclick={() => (theme = toggleTheme())}
 >
-  theme
+  {#if theme === 'dark'}
+    <Sun class="size-3.5" />
+  {:else}
+    <Moon class="size-3.5" />
+  {/if}
 </button>
