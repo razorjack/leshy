@@ -1,5 +1,5 @@
 import type { StructuralDetector } from "../../types.ts";
-import { todoGenerate } from "../../generate/todo.ts";
+import { generators } from "../../generate/generators.ts";
 
 const CHECKSUM_WEIGHTS = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
 
@@ -37,5 +37,5 @@ export const pesel: StructuralDetector = {
   match: /(?<!\d)\d{11}(?!\d)/g,
   keys: /^pesel$/i,
   validate: (text) => peselChecksum(text) && dateValid(text),
-  generate: todoGenerate("pesel"),
+  generate: generators.pesel,
 };

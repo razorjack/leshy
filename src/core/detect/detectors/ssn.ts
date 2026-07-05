@@ -1,5 +1,5 @@
 import type { StructuralDetector } from "../../types.ts";
-import { todoGenerate } from "../../generate/todo.ts";
+import { generators } from "../../generate/generators.ts";
 
 export const ssn: StructuralDetector = {
   id: "ssn",
@@ -13,5 +13,5 @@ export const ssn: StructuralDetector = {
     const [area = "", group = "", serial = ""] = text.split("-");
     return area !== "000" && area !== "666" && group !== "00" && serial !== "0000";
   },
-  generate: todoGenerate("ssn"),
+  generate: generators.ssn,
 };

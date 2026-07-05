@@ -10,6 +10,12 @@ const TEST_NET = /^(?:192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}$/;
 // RFC 2606 reserved TLD — Leshy's fake namespace for emails and hostnames.
 const EXAMPLE_TLD = /\.example$/i;
 
+// RFC 3849 documentation prefix — Leshy's fake namespace for IPv6.
+const DOC_IPV6 = /^2001:0*db8:/i;
+
+// Locally-administered unicast (second nibble 2/6/A/E) — Leshy's fake MAC band.
+const FAKE_MAC = /^[0-9A-Fa-f][26AEae]([:-])(?:[0-9A-Fa-f]{2}\1){4}[0-9A-Fa-f]{2}$/;
+
 /**
  * Default preserve rules. `db-ids` and `timestamps` protect debugging value
  * (TIER.PRESERVE_RULE — a validated checksum still beats them). The `fake-*`
@@ -37,6 +43,16 @@ export const defaultPreserve: PreserveRule[] = [
   {
     id: "fake-ip",
     isFake: (text) => TEST_NET.test(text),
+    enabled: true,
+  },
+  {
+    id: "fake-ipv6",
+    isFake: (text) => DOC_IPV6.test(text),
+    enabled: true,
+  },
+  {
+    id: "fake-mac",
+    isFake: (text) => FAKE_MAC.test(text),
     enabled: true,
   },
   {

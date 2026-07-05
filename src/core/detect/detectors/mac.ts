@@ -1,5 +1,5 @@
 import type { StructuralDetector } from "../../types.ts";
-import { todoGenerate } from "../../generate/todo.ts";
+import { generators } from "../../generate/generators.ts";
 
 export const mac: StructuralDetector = {
   id: "mac",
@@ -9,5 +9,5 @@ export const mac: StructuralDetector = {
   enabled: true,
   match: /(?<![\w:.-])(?:[0-9A-Fa-f]{2}([:-]))(?:[0-9A-Fa-f]{2}\1){4}[0-9A-Fa-f]{2}(?![\w:.-])/g,
   keys: /^mac$|mac_?addr/i,
-  generate: todoGenerate("mac"),
+  generate: generators.mac,
 };
