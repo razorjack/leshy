@@ -1,20 +1,44 @@
 <script lang="ts">
   import { session } from '../../state/session.svelte.ts'
+  import { splitOutput } from '../segments.ts'
   import TokenMark from './TokenMark.svelte'
+  import { Button } from './ui/button/index.ts'
+
+  // A fake becomes a <TokenMark>; everything else is verbatim text (see splitOutput).
+  const segments = $derived(splitOutput(session.output, session.replacements))
+  const hasOutput = $derived(session.output.length > 0)
+
+  let copied = $state(false)
+  let copyTimer: ReturnType<typeof setTimeout> | undefined
+  const copy = async (): Promise<void> => {
+    await navigator.clipboard.writeText(session.output)
+    copied = true
+    clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => (copied = false), 1600)
+  }
 </script>
 
-<!-- TODO(opus): implementation-plan.md step 13 — render session.output split
-     around session.replacements as text + <TokenMark> runs; copy button
-     writes the raw output string via navigator.clipboard.writeText. -->
-<section class="flex flex-col bg-background">
-  <h2 class="px-6 pt-4 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-    Scrubbed
-  </h2>
-  <div class="flex-1 overflow-auto whitespace-pre-wrap p-6 font-mono text-sm">
-    {#if session.replacements.length > 0}
-      <TokenMark fake="preview" label="Person name" />
+<section class="flex min-h-0 flex-col bg-background">
+  <div class="flex items-center justify-between px-6 pt-4">
+    <h2 class="text-xs font-medium uppercase tracking-widest text-muted-foreground">Scrubbed</h2>
+    {#if hasOutput}
+      <Button variant="ghost" size="sm" class="-my-1 h-7 text-xs" onclick={copy}>
+        {copied ? 'Copied' : 'Copy'}
+      </Button>
+    {/if}
+  </div>
+  <div class="flex-1 overflow-auto p-6 font-mono text-sm">
+    {#if hasOutput}
+      <!-- prettier-ignore -->
+      <div class="whitespace-pre-wrap break-words"
+        >{#each segments as seg}{#if seg.kind === 'text'}{seg.text}{:else}<TokenMark
+              fake={seg.rep.fake}
+              label={seg.rep.label}
+            />{/if}{/each}</div>
+    {:else if session.error}
+      <span class="text-destructive">{session.error}</span>
     {:else}
-      <span class="text-muted-foreground">{session.output || 'Output appears here.'}</span>
+      <span class="text-muted-foreground">Nothing leaves the woods.</span>
     {/if}
   </div>
 </section>
