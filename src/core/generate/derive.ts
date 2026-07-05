@@ -11,34 +11,45 @@ import type { EntityType } from "../types.ts";
  * Same input ⇒ same fake, across pastes and sessions, with nothing stored.
  */
 
-/**
- * TODO(opus): implementation-plan.md step 8.
- * - trim + NFC + collapse inner whitespace for all types
- * - email: lowercase whole value
- * - person: keep diacritics and case-fold ONLY for the identity key
- * - phone/pesel/ssn/credit-card/iban: strip separators (digits/uppercase only)
- */
+// Types whose identity is the bare alphanumeric payload: separators and casing
+// carry no identity, so "+48 601 234 567" and "48601234567" are one person.
+const DIGIT_TYPES: ReadonlySet<EntityType> = new Set([
+  "phone",
+  "pesel",
+  "ssn",
+  "credit-card",
+  "iban",
+]);
+
 export const normalise = (value: string, type: EntityType): string => {
-  void value;
-  void type;
-  throw new Error("normalise() not implemented — docs/implementation-plan.md step 8");
+  const base = value.normalize("NFC").trim().replace(/\s+/g, " ");
+  // person casefolds for the identity key but KEEPS diacritics — folding
+  // `Łukasz`→`Lukasz` could link two distinct people (adr/0002).
+  if (type === "email" || type === "person") return base.toLowerCase();
+  if (DIGIT_TYPES.has(type)) return base.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+  return base;
 };
 
-/** TODO(opus): implementation-plan.md step 8. SHA-256 → first 4 bytes → uint32. */
-export const deriveSeed = (salt: string, scope: string, normalized: string): Promise<number> => {
-  void salt;
-  void scope;
-  void normalized;
-  throw new Error("deriveSeed() not implemented — docs/implementation-plan.md step 8");
+export const deriveSeed = async (
+  salt: string,
+  scope: string,
+  normalized: string,
+): Promise<number> => {
+  const data = new TextEncoder().encode(`leshy:v1:${salt}:${scope}:${normalized}`);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return new DataView(digest).getUint32(0, false);
 };
 
 /**
- * TODO(opus): implementation-plan.md step 9.
  * Splits an email local part / username into name-ish tokens so linked
  * identities work: tokens of "jan.kowalski" == tokens of "Jan Kowalski"
  * ⇒ both derive the same fake person. Returns null when not name-like.
  */
 export const nameTokens = (value: string): string[] | null => {
-  void value;
-  throw new Error("nameTokens() not implemented — docs/implementation-plan.md step 9");
+  const parts = value
+    .normalize("NFC")
+    .toLowerCase()
+    .split(/[._+\-\s]+/);
+  const tokens = parts.map((p) => p.replace(/\d+/g, "")).filter((p) => /^\p{L}{2,}$/u.test(p));
+  return tokens.length > 0 ? tokens : null;
 };
