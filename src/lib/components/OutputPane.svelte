@@ -3,6 +3,7 @@
   import { splitOutput } from '../segments.ts'
   import TokenMark from './TokenMark.svelte'
   import { Button } from './ui/button/index.ts'
+  import * as Tooltip from './ui/tooltip/index.ts'
 
   // A fake becomes a <TokenMark>; everything else is verbatim text (see splitOutput).
   const segments = $derived(splitOutput(session.output, session.replacements))
@@ -29,12 +30,14 @@
   </div>
   <div class="flex-1 overflow-auto p-6 font-mono text-sm">
     {#if hasOutput}
-      <!-- prettier-ignore -->
-      <div class="whitespace-pre-wrap break-words"
-        >{#each segments as seg}{#if seg.kind === 'text'}{seg.text}{:else}<TokenMark
-              fake={seg.rep.fake}
-              label={seg.rep.label}
-            />{/if}{/each}</div>
+      <Tooltip.Provider delayDuration={200}>
+        <!-- prettier-ignore -->
+        <div class="whitespace-pre-wrap break-words"
+          >{#each segments as seg}{#if seg.kind === 'text'}{seg.text}{:else}<TokenMark
+                fake={seg.rep.fake}
+                label={seg.rep.label}
+              />{/if}{/each}</div>
+      </Tooltip.Provider>
     {:else if session.error}
       <span class="text-destructive">{session.error}</span>
     {:else}
