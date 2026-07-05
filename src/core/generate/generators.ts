@@ -109,6 +109,115 @@ const pesel: Generate = (ctx) => {
   return `${ten}${(10 - (sum % 10)) % 10}`;
 };
 
+const digit = (f: ReturnType<typeof fakerFor>): string => String(f.number.int({ min: 0, max: 9 }));
+
+const phone: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  const chars = Array.from(ctx.original);
+  // Keep the country-code digit run right after a leading '+'; the layout
+  // (spaces, dashes, parens) survives because only digit chars are swapped.
+  const keep = new Set<number>();
+  const plus = ctx.original.indexOf("+");
+  if (plus >= 0) {
+    for (let i = plus + 1; i < chars.length && /\d/.test(chars[i]!); i++) keep.add(i);
+  }
+  return chars.map((c, i) => (/\d/.test(c) && !keep.has(i) ? digit(f) : c)).join("");
+};
+
+/** Luhn check digit for a digit prefix (the appended digit sits un-doubled). */
+const luhnCheckDigit = (prefix: string[]): string => {
+  let sum = 0;
+  let alt = true;
+  for (let i = prefix.length - 1; i >= 0; i--) {
+    let d = Number(prefix[i]);
+    if (alt) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    sum += d;
+    alt = !alt;
+  }
+  return String((10 - (sum % 10)) % 10);
+};
+
+const creditCard: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  const chars = Array.from(ctx.original);
+  const idx = chars.map((c, i) => (/\d/.test(c) ? i : -1)).filter((i) => i >= 0);
+  const out = idx.map((i) => chars[i]!);
+  for (let k = 1; k < out.length - 1; k++) out[k] = digit(f); // keep brand digit, hash middle
+  out[out.length - 1] = luhnCheckDigit(out.slice(0, -1)); // fix the check digit
+  idx.forEach((i, k) => (chars[i] = out[k]!));
+  return chars.join("");
+};
+
+/** Two IBAN check digits so `country + check + bban` passes mod-97. */
+const ibanCheckDigits = (country: string, bban: string): string => {
+  const expanded = `${bban}${country}00`.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
+  let r = 0;
+  for (const ch of expanded) r = (r * 10 + Number(ch)) % 97;
+  return String(98 - r).padStart(2, "0");
+};
+
+const iban: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  const raw = ctx.original;
+  const country = raw.slice(0, 2);
+  const bban = Array.from(raw.slice(4), (ch) =>
+    /\d/.test(ch) ? digit(f) : f.string.alpha({ length: 1, casing: "upper" }),
+  ).join("");
+  return `${country}${ibanCheckDigits(country, bban)}${bban}`;
+};
+
+const B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+const jwt: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  const seg = (len: number): string =>
+    Array.from({ length: Math.max(len, 1) }, () => B64URL[f.number.int({ min: 0, max: 63 })]).join(
+      "",
+    );
+  // Three base64url pseudoword segments of the source's lengths — never decodable.
+  return ctx.original
+    .split(".")
+    .map((p) => seg(p.length))
+    .join(".");
+};
+
+// Known secret prefixes (mirrors api-key detector) kept verbatim on the fake.
+const API_PREFIXES = [
+  "github_pat_",
+  "sk_live_",
+  "pk_live_",
+  "whsec_",
+  "ghp_",
+  "gho_",
+  "xoxb-",
+  "xoxp-",
+  "xoxa-",
+  "xoxr-",
+  "xoxs-",
+  "AKIA",
+  "ASIA",
+  "AIza",
+  "sk-",
+];
+
+const apiKey: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  const src = ctx.original;
+  const prefix = API_PREFIXES.find((p) => src.startsWith(p)) ?? src.slice(0, 4);
+  const tail = Array.from(src.slice(prefix.length), (ch) => {
+    if (/[0-9]/.test(ch)) return digit(f);
+    if (/[A-Z]/.test(ch)) return f.string.alpha({ length: 1, casing: "upper" });
+    if (/[a-z]/.test(ch)) return f.string.alpha({ length: 1, casing: "lower" });
+    return ch; // preserve separators like '_' and '-'
+  }).join("");
+  return `${prefix}${tail}`;
+};
+
+const uuid: Generate = (ctx) => fakerFor(ctx.seed, "en").string.uuid();
+
 export const generators = {
   email,
   ipv4,
@@ -116,4 +225,10 @@ export const generators = {
   mac,
   ssn,
   pesel,
+  phone,
+  "credit-card": creditCard,
+  iban,
+  jwt,
+  "api-key": apiKey,
+  uuid,
 } satisfies Record<string, Generate>;

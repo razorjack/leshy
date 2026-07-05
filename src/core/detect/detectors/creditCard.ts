@@ -1,5 +1,5 @@
 import type { StructuralDetector } from "../../types.ts";
-import { todoGenerate } from "../../generate/todo.ts";
+import { generators } from "../../generate/generators.ts";
 
 const luhn = (digits: string): boolean => {
   let sum = 0;
@@ -28,5 +28,5 @@ export const creditCard: StructuralDetector = {
     const digits = text.replace(/\D/g, "");
     return digits.length >= 13 && digits.length <= 19 && /^[2-6]/.test(digits) && luhn(digits);
   },
-  generate: todoGenerate("credit-card"),
+  generate: generators["credit-card"],
 };

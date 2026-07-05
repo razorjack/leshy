@@ -3,6 +3,9 @@ import { makeContext } from "../src/core/generate/context.ts";
 import { generators } from "../src/core/generate/generators.ts";
 import { detect } from "../src/core/engine.ts";
 import { resolveConfig } from "../src/core/config.ts";
+import { creditCard } from "../src/core/detect/detectors/creditCard.ts";
+import { iban } from "../src/core/detect/detectors/iban.ts";
+import { phone } from "../src/core/detect/detectors/phone.ts";
 import type { EntityType } from "../src/core/types.ts";
 
 const config = resolveConfig();
@@ -83,4 +86,69 @@ describe("structured generators — determinism (fixed salt ⇒ exact strings)",
       expect(await fakeOf(gen, original, type)).toBe(expected);
     });
   }
+});
+
+describe("shape-preserving digit generators", () => {
+  it("phone keeps +CC and the separator layout, replaces subscriber digits", async () => {
+    const fake = await fakeOf("phone", "+48 601 234 567", "phone");
+    expect(fake).toMatch(/^\+48 \d{3} \d{3} \d{3}$/);
+    expect(fake).not.toBe("+48 601 234 567");
+    expect(phone.validate!(fake, fake, 0)).toBe(true);
+    expect(await fakeOf("phone", "+1 (415) 555-2671", "phone")).toMatch(
+      /^\+1 \(\d{3}\) \d{3}-\d{4}$/,
+    );
+  });
+
+  it("credit-card keeps the brand digit, fixes Luhn, preserves layout", async () => {
+    const fake = await fakeOf("credit-card", "4111 1111 1111 1111", "credit-card");
+    expect(fake).toMatch(/^4\d{3} \d{4} \d{4} \d{4}$/);
+    expect(creditCard.validate!(fake, fake, 0)).toBe(true);
+  });
+
+  it("iban keeps the country code, recomputes mod-97", async () => {
+    const fake = await fakeOf("iban", "DE89370400440532013000", "iban");
+    expect(fake.slice(0, 2)).toBe("DE");
+    expect(fake).toHaveLength(22);
+    expect(iban.validate!(fake, fake, 0)).toBe(true);
+    const pl = await fakeOf("iban", "PL61109010140000071219812874", "iban");
+    expect(pl.slice(0, 2)).toBe("PL");
+    expect(iban.validate!(pl, pl, 0)).toBe(true);
+  });
+
+  it("jwt is three base64url segments of the source lengths", async () => {
+    const src = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9P";
+    const fake = await fakeOf("jwt", src, "jwt");
+    const parts = fake.split(".");
+    expect(parts).toHaveLength(3);
+    parts.forEach((p, i) => {
+      expect(p).toMatch(/^[A-Za-z0-9_-]+$/);
+      expect(p.length).toBe(src.split(".")[i]!.length);
+    });
+  });
+
+  it("api-key keeps the prefix and length, hashes the tail", async () => {
+    const fake = await fakeOf("api-key", "AKIAIOSFODNN7REALKEY", "api-key");
+    expect(fake).toMatch(/^AKIA[0-9A-Z]{16}$/);
+    expect(fake).toHaveLength("AKIAIOSFODNN7REALKEY".length);
+    expect(await fakeOf("api-key", "ghp_a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8", "api-key")).toMatch(
+      /^ghp_[A-Za-z0-9]{36}$/,
+    );
+  });
+
+  it("uuid is v4-shaped", async () => {
+    const fake = await fakeOf("uuid", "123e4567-e89b-12d3-a456-426614174000", "uuid");
+    expect(fake).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+
+  it("digit generators are deterministic (fixed salt ⇒ exact strings)", async () => {
+    expect(await fakeOf("phone", "+48 601 234 567", "phone")).toBe("+48 252 220 709");
+    expect(await fakeOf("credit-card", "4111 1111 1111 1111", "credit-card")).toBe(
+      "4378 1130 5910 0583",
+    );
+    expect(await fakeOf("iban", "DE89370400440532013000", "iban")).toBe("DE33101951368393958953");
+    expect(await fakeOf("api-key", "AKIAIOSFODNN7REALKEY", "api-key")).toBe("AKIAKXDKHTTE4QLNIDIE");
+    expect(await fakeOf("uuid", "123e4567-e89b-12d3-a456-426614174000", "uuid")).toBe(
+      "e8b8ae9e-c2c9-481f-9bc9-9f43e9a037b1",
+    );
+  });
 });

@@ -1,5 +1,5 @@
 import type { StructuralDetector } from "../../types.ts";
-import { todoGenerate } from "../../generate/todo.ts";
+import { generators } from "../../generate/generators.ts";
 
 // Candidates: "+" international form, or separator-grouped digit runs.
 // The validator enforces plausible digit counts and rejects date/time shapes,
@@ -19,5 +19,5 @@ export const phone: StructuralDetector = {
     if (/^\d{4}-\d{2}-\d{2}/.test(text)) return false;
     return !/\d:\d/.test(input.slice(Math.max(0, start - 1), start + text.length + 1));
   },
-  generate: todoGenerate("phone"),
+  generate: generators.phone,
 };

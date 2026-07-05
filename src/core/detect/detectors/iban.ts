@@ -1,5 +1,5 @@
 import type { StructuralDetector } from "../../types.ts";
-import { todoGenerate } from "../../generate/todo.ts";
+import { generators } from "../../generate/generators.ts";
 
 const mod97 = (iban: string): boolean => {
   const rearranged = iban.slice(4) + iban.slice(0, 4);
@@ -20,5 +20,5 @@ export const iban: StructuralDetector = {
   match: /(?<![A-Z0-9])[A-Z]{2}\d{2}[A-Z0-9]{11,30}(?![A-Z0-9])/g,
   keys: /iban|account_?(?:number|no)/i,
   validate: mod97,
-  generate: todoGenerate("iban"),
+  generate: generators.iban,
 };
