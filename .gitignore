@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.vite/
+.DS_Store
+*.local
+
+# model weights are fetched by scripts/fetch-model.ts, never committed
+public/models/

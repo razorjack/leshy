@@ -1,0 +1,72 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { detect } from "../../src/core/engine.ts";
+import { resolveConfig } from "../../src/core/config.ts";
+import { detectSemantic } from "../../src/core/detect/semantic/detect.ts";
+import { models, DEFAULT_MODEL } from "../../src/core/detect/semantic/models.ts";
+import { samples, hardSamples } from "../../tests/fixtures/samples.ts";
+import { addScores, evaluateSample, type SampleScore } from "./evaluate.ts";
+import { loadGlinerNode } from "./gliner-node.ts";
+
+// The PII validation spike (docs/adr/0001-pii-detection.md). Runs the full
+// detection pipeline — structural + key-context + GLiNER — over the brief's
+// samples plus a hard set with no key hints, and fails on any regression.
+//
+// Usage: npm run models:fetch && npm run spike [-- <model-id>]
+
+const modelId = process.argv[2] ?? DEFAULT_MODEL;
+const spec = models[modelId];
+if (!spec) {
+  console.error(`unknown model '${modelId}' — known: ${Object.keys(models).join(", ")}`);
+  process.exit(1);
+}
+const weights = path.join("public", "models", spec.id, spec.files.weights);
+if (!existsSync(weights)) {
+  console.error(`missing ${weights} — run: npm run models:fetch -- ${spec.id}`);
+  process.exit(1);
+}
+
+const config = resolveConfig();
+const zero: SampleScore = { full: 0, partial: 0, miss: 0, preserveViolations: 0 };
+
+console.log("=== structural + key-context only (model off) ===");
+let noModel = zero;
+for (const sample of samples) {
+  const spans = await detect(sample.input, { config });
+  noModel = addScores(noModel, evaluateSample(sample, spans, true));
+}
+
+console.log(`\n=== full pipeline: + ${spec.id} @ threshold ${config.semantic.threshold} ===`);
+const t0 = performance.now();
+const gliner = await loadGlinerNode(modelId);
+console.log(`(model loaded in ${((performance.now() - t0) / 1000).toFixed(1)}s)`);
+
+const semantic = (input: string): ReturnType<typeof detectSemantic> =>
+  detectSemantic(input, config.detectors, gliner, config.semantic.threshold);
+
+let full = zero;
+let totalMs = 0;
+for (const sample of [...samples, ...hardSamples]) {
+  const t1 = performance.now();
+  const spans = await detect(sample.input, { config, semantic });
+  totalMs += performance.now() - t1;
+  full = addScores(full, evaluateSample(sample, spans, true));
+}
+
+const goldCount = [...samples, ...hardSamples]
+  .flatMap((s) => s.gold)
+  .filter((g) => g.expect === "catch").length;
+console.log(
+  `\nno-model:  full=${noModel.full} partial=${noModel.partial} miss=${noModel.miss} preserve-violations=${noModel.preserveViolations}`,
+);
+console.log(
+  `pipeline:  full=${full.full}/${goldCount} partial=${full.partial} miss=${full.miss} preserve-violations=${full.preserveViolations}`,
+);
+console.log(
+  `avg detect latency: ${(totalMs / (samples.length + hardSamples.length)).toFixed(0)}ms/sample`,
+);
+
+const pass =
+  full.full === goldCount && full.partial === 0 && full.miss === 0 && full.preserveViolations === 0;
+console.log(pass ? "\nPASS" : "\nFAIL");
+process.exit(pass ? 0 : 1);
