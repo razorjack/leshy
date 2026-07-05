@@ -68,16 +68,14 @@ const configFor = (o: ScrubOverrides | undefined): ResolvedConfig => {
   return resolveConfig(merged);
 };
 
+type ScrubRequest = Extract<WorkerRequest, { kind: "scrub" }>;
+
 const post = (msg: WorkerResponse): void => self.postMessage(msg);
 const progress = (id: number, stage: WorkerStage): void => post({ id, kind: "progress", stage });
+const fail = (id: number, e: unknown): void =>
+  post({ id, kind: "error", message: e instanceof Error ? e.message : String(e) });
 
-const handle = async (msg: WorkerRequest): Promise<WorkerResponse> => {
-  if (msg.kind === "warmup") {
-    progress(msg.id, "loading-model");
-    await getGliner();
-    return { id: msg.id, kind: "ready" };
-  }
-
+const runScrub = async (msg: ScrubRequest): Promise<void> => {
   const config = configFor(msg.overrides);
   let semantic: ((input: string) => Promise<Span[]>) | undefined;
   if (config.semantic.enabled) {
@@ -88,13 +86,40 @@ const handle = async (msg: WorkerRequest): Promise<WorkerResponse> => {
   }
   progress(msg.id, "detecting");
   const result = await scrub(msg.input, { config, semantic });
-  return { id: msg.id, kind: "result", result };
+  post({ id: msg.id, kind: "result", result });
+};
+
+// The ONNX session is not reentrant, so scrubs run one at a time. While one is
+// running only the latest queued request survives — intermediate ones are
+// dropped (the client has already superseded them).
+let busy = false;
+let queued: ScrubRequest | undefined;
+
+const drain = async (): Promise<void> => {
+  if (busy) return;
+  busy = true;
+  try {
+    while (queued) {
+      const job = queued;
+      queued = undefined;
+      await runScrub(job).catch((e: unknown) => fail(job.id, e));
+    }
+  } finally {
+    busy = false;
+  }
 };
 
 self.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
-  const { id } = event.data;
-  // Errors are always replied, never thrown out of the handler.
-  void handle(event.data).then(post, (e: unknown) => {
-    post({ id, kind: "error", message: e instanceof Error ? e.message : String(e) });
-  });
+  const msg = event.data;
+  if (msg.kind === "warmup") {
+    // Warmup never runs inference, so it is safe outside the scrub queue.
+    if (!glinerReady) progress(msg.id, "loading-model");
+    getGliner().then(
+      () => post({ id: msg.id, kind: "ready" }),
+      (e: unknown) => fail(msg.id, e),
+    );
+    return;
+  }
+  queued = msg;
+  void drain();
 });

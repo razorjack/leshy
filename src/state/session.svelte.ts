@@ -8,9 +8,10 @@ const DEBOUNCE_MS = 150;
 
 /**
  * Owns the ScrubWorker lifecycle. The worker (and its ~180 MB model) is created
- * lazily on first interaction and warmed up immediately; input changes are
- * debounced, and stale responses are dropped by comparing a monotonic token so
- * fast typing yields exactly one final result.
+ * lazily on the first real input and warmed up immediately. Typing is debounced;
+ * a paste scrubs immediately. Every scrub supersedes the previous one (the
+ * client cancels it and the worker coalesces to the latest), so a burst of input
+ * yields exactly one final result and never overlaps inference.
  */
 class Session {
   input = $state("");
@@ -18,23 +19,12 @@ class Session {
   replacements = $state<Replacement[]>([]);
   stage = $state<SessionStage>("idle");
   error = $state<string | undefined>(undefined);
-  /** Reassign (not mutate) to re-scrub the current input, e.g. from settings. */
-  overrides = $state<ScrubOverrides>({});
 
+  private overrides: ScrubOverrides = {};
   private worker: ScrubWorker | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private token = 0;
   private running = false;
-
-  constructor() {
-    $effect.root(() => {
-      $effect(() => {
-        const value = this.input;
-        void this.overrides; // track: settings changes re-scrub
-        this.schedule(value);
-      });
-    });
-  }
 
   private ensureWorker(): ScrubWorker {
     if (!this.worker) {
@@ -47,7 +37,9 @@ class Session {
     return this.worker;
   }
 
-  private schedule(value: string): void {
+  /** Called from the input surface. Typing debounces; a paste runs immediately. */
+  setInput(value: string, immediate = false): void {
+    this.input = value;
     if (this.timer) clearTimeout(this.timer);
     if (value.trim() === "") {
       this.token++; // cancel any in-flight response
@@ -57,8 +49,18 @@ class Session {
       this.error = undefined;
       return;
     }
-    this.ensureWorker(); // lazy: created + warmed on the first real input
-    this.timer = setTimeout(() => void this.run(value), DEBOUNCE_MS);
+    this.ensureWorker();
+    if (immediate) {
+      void this.run(value);
+    } else {
+      this.timer = setTimeout(() => void this.run(value), DEBOUNCE_MS);
+    }
+  }
+
+  /** Settings changes: re-scrub the current input immediately with new overrides. */
+  setOverrides(overrides: ScrubOverrides): void {
+    this.overrides = overrides;
+    if (this.input.trim() !== "") void this.run(this.input);
   }
 
   private async run(value: string): Promise<void> {
@@ -68,15 +70,13 @@ class Session {
     this.error = undefined;
     this.stage = "working";
     try {
-      // $state proxies aren't structured-cloneable; snapshot to a plain object
-      // before it crosses the worker boundary (postMessage).
-      const result = await worker.scrub(value, $state.snapshot(this.overrides));
+      const result = await worker.scrub(value, this.overrides);
       if (token !== this.token) return; // superseded by a newer request
       this.output = result.output;
       this.replacements = result.replacements;
       this.stage = "done";
     } catch (e) {
-      if (token !== this.token) return;
+      if (token !== this.token) return; // superseded — its rejection is expected
       this.error = e instanceof Error ? e.message : String(e);
       this.stage = "error";
     } finally {

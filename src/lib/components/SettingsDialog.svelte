@@ -23,7 +23,7 @@
   const apply = (): void => {
     const disable = detectors.filter((d) => defaults[d.id] && !enabled[d.id]).map((d) => d.id)
     const enable = detectors.filter((d) => !defaults[d.id] && enabled[d.id]).map((d) => d.id)
-    session.overrides = { disable, enable, semanticEnabled: semantic, ...(salt ? { salt } : {}) }
+    session.setOverrides({ disable, enable, semanticEnabled: semantic, ...(salt ? { salt } : {}) })
     localStorage.setItem(OVERRIDES_KEY, JSON.stringify({ disable, enable, semanticEnabled: semantic }))
     if (salt) localStorage.setItem(SALT_KEY, salt)
     else localStorage.removeItem(SALT_KEY)

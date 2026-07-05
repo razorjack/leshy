@@ -5,6 +5,7 @@ import type { ScrubOverrides, WorkerRequest, WorkerResponse, WorkerStage } from 
 export class ScrubWorker {
   private readonly worker: Worker;
   private nextId = 1;
+  private lastScrubId: number | undefined;
   private readonly pending = new Map<
     number,
     { resolve: (r: ScrubResult) => void; reject: (e: Error) => void }
@@ -38,7 +39,17 @@ export class ScrubWorker {
   }
 
   scrub(input: string, overrides?: ScrubOverrides): Promise<ScrubResult> {
+    // Supersede the previous scrub: the worker coalesces to the latest and never
+    // replies to the dropped one, so settle its promise here to avoid a leak.
+    if (this.lastScrubId !== undefined) {
+      const prev = this.pending.get(this.lastScrubId);
+      if (prev) {
+        this.pending.delete(this.lastScrubId);
+        prev.reject(new Error("superseded"));
+      }
+    }
     const id = this.nextId++;
+    this.lastScrubId = id;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
       this.post({ id, kind: "scrub", input, overrides });
