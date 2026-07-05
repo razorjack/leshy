@@ -21,6 +21,7 @@ const base = resolveConfig(userConfig);
 
 // The model is heavy (~180 MB): load it once, lazily, and share the promise.
 let glinerPromise: Promise<Gliner> | undefined;
+let glinerReady = false;
 
 const loadGliner = async (): Promise<Gliner> => {
   const spec = models[base.semantic.model];
@@ -46,7 +47,11 @@ const loadGliner = async (): Promise<Gliner> => {
   );
 };
 
-const getGliner = (): Promise<Gliner> => (glinerPromise ??= loadGliner());
+const getGliner = (): Promise<Gliner> =>
+  (glinerPromise ??= loadGliner().then((g) => {
+    glinerReady = true;
+    return g;
+  }));
 
 /** Fold serialisable UI overrides over the code-defined config (adr/0006). */
 const configFor = (o: ScrubOverrides | undefined): ResolvedConfig => {
@@ -76,7 +81,7 @@ const handle = async (msg: WorkerRequest): Promise<WorkerResponse> => {
   const config = configFor(msg.overrides);
   let semantic: ((input: string) => Promise<Span[]>) | undefined;
   if (config.semantic.enabled) {
-    if (!glinerPromise) progress(msg.id, "loading-model");
+    if (!glinerReady) progress(msg.id, "loading-model");
     const gliner = await getGliner();
     semantic = (input) =>
       detectSemantic(input, config.detectors, gliner, config.semantic.threshold);
