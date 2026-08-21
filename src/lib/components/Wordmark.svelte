@@ -1,20 +1,14 @@
 <script lang="ts">
-  // The watcher mark + display wordmark (docs/adr/0005). The eye blinks slowly
-  // while the worker is scanning; static under prefers-reduced-motion.
+  // The watcher mark blinks slowly while the worker is scanning; static under
+  // prefers-reduced-motion.
   let { scanning = false }: { scanning?: boolean } = $props()
 </script>
 
 <div class="flex items-center gap-2.5">
-  <svg viewBox="0 0 64 64" class="size-6 text-primary" aria-hidden="true">
-    <path
-      d="M8 32 C20 14, 44 14, 56 32 C44 50, 20 50, 8 32 Z"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="4.5"
-      stroke-linejoin="round"
-    />
-    <circle cx="32" cy="32" r="7.5" fill="currentColor" class:blink={scanning} />
-  </svg>
+  <span class="block size-8 shrink-0" class:blink={scanning} aria-hidden="true">
+    <img src="/icons/mark-light-128.png" alt="" class="size-full object-contain dark:hidden" />
+    <img src="/icons/mark-dark-128.png" alt="" class="hidden size-full object-contain dark:block" />
+  </span>
   <span class="font-display text-xl font-semibold tracking-tight">Leshy</span>
 </div>
 

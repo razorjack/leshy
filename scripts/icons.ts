@@ -1,26 +1,35 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { Resvg } from "@resvg/resvg-js";
 
-// PWA icons rendered from the watcher mark. Outputs are committed so builds
-// need no image tooling; rerun `npm run icons` after changing the mark.
+// Platform icons rendered from the reviewed application icon. Outputs are
+// committed so builds need no image tooling; rerun `npm run icons` after
+// changing the source artwork.
 
-const mark = (bg: string, fg: string, pad: number): string => `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" fill="${bg}"/>
-  <g transform="translate(32 32) scale(${1 - pad}) translate(-32 -32)">
-    <path d="M8 32 C20 14, 44 14, 56 32 C44 50, 20 50, 8 32 Z" fill="none" stroke="${fg}" stroke-width="4.5" stroke-linejoin="round"/>
-    <circle cx="32" cy="32" r="7.5" fill="${fg}"/>
-  </g>
+const appSource = readFileSync("assets/brand/leshy-app-icon-dark-1024.png").toString("base64");
+const lightSource = readFileSync("assets/brand/leshy-mark-light-1024.png").toString("base64");
+const darkSource = readFileSync("assets/brand/leshy-mark-dark-1024.png").toString("base64");
+
+const mark = (source: string, scale: number, background?: string): string => {
+  const size = 1024 * scale;
+  const offset = (1024 - size) / 2;
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  ${background ? `<rect width="1024" height="1024" fill="${background}"/>` : ""}
+  <image href="data:image/png;base64,${source}" x="${offset}" y="${offset}" width="${size}" height="${size}"/>
 </svg>`;
+};
 
 const render = (svg: string, size: number): Buffer =>
   new Resvg(svg, { fitTo: { mode: "width", value: size } }).render().asPng();
 
-const DARK_SURFACE = "#101b15";
-const MOSS = "#7fc9a2";
-
 mkdirSync("public/icons", { recursive: true });
-writeFileSync("public/icons/icon-192.png", render(mark(DARK_SURFACE, MOSS, 0.12), 192));
-writeFileSync("public/icons/icon-512.png", render(mark(DARK_SURFACE, MOSS, 0.12), 512));
-writeFileSync("public/icons/maskable-512.png", render(mark(DARK_SURFACE, MOSS, 0.34), 512));
-console.log("wrote public/icons/{icon-192,icon-512,maskable-512}.png");
+writeFileSync("public/icons/mark-light-128.png", render(mark(lightSource, 0.96), 128));
+writeFileSync("public/icons/mark-dark-128.png", render(mark(darkSource, 0.96), 128));
+writeFileSync("public/icons/favicon-32.png", render(mark(appSource, 1), 32));
+writeFileSync("public/icons/apple-touch-icon-180.png", render(mark(appSource, 1, "#19251f"), 180));
+writeFileSync("public/icons/icon-192.png", render(mark(appSource, 1), 192));
+writeFileSync("public/icons/icon-512.png", render(mark(appSource, 1), 512));
+writeFileSync("public/icons/maskable-512.png", render(mark(darkSource, 0.72, "#19251f"), 512));
+console.log(
+  "wrote public/icons/{mark-light-128,mark-dark-128,favicon-32,apple-touch-icon-180,icon-192,icon-512,maskable-512}.png",
+);

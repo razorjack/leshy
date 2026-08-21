@@ -9,13 +9,14 @@ The identity is built on that single idea — **a calm, watchful presence** — 
 through one signature move and a disciplined palette. Trust reads as restraint: a privacy
 tool must feel inevitable, not decorated.
 
-### The one signature move: the watcher mark
+### The one signature move: the antlered watcher
 
-An eye formed by two leaf arcs with a round pupil (`public/favicon.svg`,
-`Wordmark.svelte`). It is the favicon, the PWA icon, the header mark, and (later) the
-scanning indicator — the eye is _open_ while detection runs. It appears nowhere else;
-no pattern fills, no repeated motifs. Motion is limited to a slow blink of this mark
-during scanning, disabled under `prefers-reduced-motion`.
+The watcher eye sits inside a pointed forest-spirit face with leaf-tipped antlers and
+paired leaf cheeks. Its strong outer silhouette stays recognizable at application-icon
+sizes without the detail of the earlier circular sigil. Theme-specific masters live in
+`assets/brand/`; `scripts/icons.ts` derives browser, PWA, and desktop sizes from the dark
+application icon. `Wordmark.svelte` uses the transparent theme variants. The whole mark
+blinks slowly while detection runs, disabled under `prefers-reduced-motion`.
 
 ### Palette (full token sheet lives in `src/app.css` — that file is the source of truth)
 
@@ -64,4 +65,8 @@ One line, used in the footer and empty state: **"Nothing leaves the woods."**
   `@theme inline`; components never hardcode color.
 - Fraunces adds 127 KB (two woff2 subsets), self-hosted — no external font request, CSP
   stays `'self'`.
-- Icon changes are one SVG + `npm run icons` (rasterizes committed PNGs).
+- Reviewed 1024 px PNG masters live in `assets/brand/`.
+- `npm run icons` regenerates the committed runtime sizes in `public/icons/`.
+- `assets/macos/Leshy.icon` keeps the editable Icon Composer source with effects disabled
+  on the flattened mark. `npm run icons:macos` uses Xcode 26 to regenerate the committed
+  `Assets.car` and fallback `Icon.icns`; normal desktop builds reuse those files.

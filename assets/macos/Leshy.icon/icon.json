@@ -1,0 +1,33 @@
+{
+  "fill": {
+    "solid": "extended-srgb:0.09804,0.14510,0.12157,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "glass": false,
+          "image-name": "leshy-mark.png",
+          "name": "Antlered watcher",
+          "position": {
+            "scale": 0.82,
+            "translation-in-points": [0, 0]
+          }
+        }
+      ],
+      "lighting": "combined",
+      "shadow": {
+        "kind": "none",
+        "opacity": 0
+      },
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}
