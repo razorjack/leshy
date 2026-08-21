@@ -102,6 +102,17 @@ describe("resolve stage", () => {
     expect(spans).toHaveLength(0);
   });
 
+  it("merges a same-type span pair into one replacement, not two", async () => {
+    // structural email (tier 300) sits inside the key-context span for the
+    // whole value (tier 200); trimming alone would fake the remainder too
+    const input = '{"email":"foo@bar.com/extra"}';
+    const spans = await detect(input, { config });
+    expect(spans).toHaveLength(1);
+    expect(spans[0]!.text).toBe("foo@bar.com/extra");
+    const { replacements } = await scrub(input, { config });
+    expect(replacements).toHaveLength(1);
+  });
+
   it("keeps timestamps out of results even when tagged by the model", async () => {
     const input = "seen 2024-01-02T10:00:00Z at gate";
     const semantic = (s: string) =>

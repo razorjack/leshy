@@ -31,9 +31,11 @@ The ordering encodes the policy questions:
 3. **Corroboration**: for types the model does not own (no enabled semantic detector —
    email, phone, ip…), a lone model guess needs an overlapping structural match, else it
    is dropped. Types with a semantic owner (person, address, org) trust the model.
-4. Same-type spans separated by ≤6 chars of glue (space/digits/punctuation) merge —
-   models return `street | building | city` as fragments; a partial replacement would
-   leak the remainder. The merged span inherits its highest-tier constituent.
+4. Same-type spans merge, in two shapes. **Overlapping**: two detectors found one value at
+   different extents (a structural email inside the key-context span for the whole field).
+   **Adjacent across ≤6 chars of glue** (space/digits/punctuation): models return
+   `street | building | city` as fragments, and a partial replacement would leak the
+   remainder. The merged span covers the union and inherits its highest-tier constituent.
 
 ### Defaults
 
@@ -70,6 +72,13 @@ The ordering encodes the policy questions:
   any span overlapping a fake-namespace span is dropped, so a fake's whole extent is
   inert on re-scrub. This is what makes `scrub(scrub(x)) === scrub(x)` hold with the
   model on (asserted in the spike's scrub pass).
+- **Overlapping same-type spans merge instead of trimming.** Trim-not-drop re-typed the
+  leftover when the shorter span was the higher-tier one: the remainder was emitted as
+  another span of the _loser's_ type and generated as that entity, so
+  `"email": "foo@bar.com/extra"` produced two fake emails spliced together and
+  `?email=…&token=abc` turned `&token=abc` into an email address. Merging settles the
+  same-type case; trim-not-drop still governs spans of different types, where the remainder
+  genuinely is a different entity and redacting it is the point.
 - **`fake-mac` and `fake-ipv6` preserve rules added** to complete the idempotence
   namespaces ADR-0002 already names. Accepted recall cost, per ADR-0002's namespace
   choice: a _real_ locally-administered MAC (second nibble 2/6/A/E) under a MAC key is

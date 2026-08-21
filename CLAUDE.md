@@ -80,8 +80,9 @@ PII-ish keys, and a zero-shot GLiNER model (gliner-x-small, in-worker) for names
 addresses, orgs. `resolve()` filters model noise by rule, merges fragments, applies
 preserve rules (db ids, timestamps, Leshy's own fake namespaces) and settles overlaps by
 precedence tier (500 fake-preserve > 400 validated > 350 preserve > 300 structural >
-200 key-context > 100 semantic), trimming losers so coverage never shrinks. Validated:
-22/22 catches, 0 preserve violations (`npm run spike`).
+200 key-context > 100 semantic), merging same-type overlaps and trimming the rest so
+coverage never shrinks. Validated: 22/22 catches, 0 preserve violations
+(`npm run spike`).
 
 ## Extending detection (the PESEL-class worked example)
 

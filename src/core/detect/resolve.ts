@@ -18,10 +18,20 @@ const overlaps = (a: { start: number; end: number }, b: { start: number; end: nu
   a.start < b.end && a.end > b.start;
 
 /**
- * Merge same-type spans separated only by short glue (whitespace, digits,
- * punctuation). Detectors tend to return street / building / city as adjacent
- * fragments; a partial replacement would leak the remainder. The merged span
- * keeps the identity of its highest-tier constituent.
+ * Merge same-type spans that describe one entity, in two shapes:
+ *
+ *  - **overlapping**: two detectors found the same value at different extents
+ *    (a structural email inside the key-context span for the whole value).
+ *    Without this the shorter, higher-tier span wins and the remainder is
+ *    emitted as a second span of the same type — a value like
+ *    `"email": "foo@bar.com/extra"` would produce two fake emails spliced
+ *    together.
+ *  - **adjacent across short glue** (whitespace, digits, punctuation), limited
+ *    to address/person/org: models return street / building / city as separate
+ *    fragments, and a partial replacement would leak the remainder.
+ *
+ * The merged span spans the union and keeps the identity of its highest-tier
+ * constituent.
  */
 const mergeAdjacent = (spans: Span[], input: string): Span[] => {
   const glue = /^[\s\d,/.·-]{0,6}$/;
@@ -30,12 +40,13 @@ const mergeAdjacent = (spans: Span[], input: string): Span[] => {
   const out: Span[] = [];
   for (const s of sorted) {
     const prev = out[out.length - 1];
+    // sorted by start, so prev.start <= s.start: overlap reduces to this
+    const overlapping = prev !== undefined && s.start < prev.end;
     if (
       prev !== undefined &&
       prev.type === s.type &&
-      mergeable.has(s.type) &&
-      s.start >= prev.end &&
-      glue.test(input.slice(prev.end, s.start))
+      (overlapping ||
+        (mergeable.has(s.type) && s.start >= prev.end && glue.test(input.slice(prev.end, s.start))))
     ) {
       const winner = spanTier(s) > spanTier(prev) ? s : prev;
       prev.detector = winner.detector;
