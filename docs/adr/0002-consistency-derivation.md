@@ -93,6 +93,12 @@ n values in a paste; the alternative is a persistent registry, rejected below).
   and their linked email may lose linkage for that one value. This is the collision
   consequence already accepted above ("a collision victim may differ"), traded for
   guaranteed loop termination.
+- **A fake equal to its source counts as a collision.** The within-run map compared fakes
+  only to other fakes, so a generator that failed to substitute emitted the source verbatim
+  and still reported a replacement (phone numbers written without separators kept every
+  digit as "country code"). `engine.ts` now rejects `fake === span.text` and reseeds, which
+  makes "a generator must change its input" an engine invariant rather than a per-generator
+  obligation.
 - **Person locale from the value alone.** The `GenerateContext` exposes only the matched
   value, so the person generator picks its locale from the value's own diacritics/shape,
   not surrounding context. A diacritic-free Polish name (`Jan Kowalski`) therefore gets an

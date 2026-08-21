@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { makeContext } from "../src/core/generate/context.ts";
 import { generators } from "../src/core/generate/generators.ts";
-import { detect } from "../src/core/engine.ts";
+import { detect, scrub } from "../src/core/engine.ts";
 import { resolveConfig } from "../src/core/config.ts";
 import { creditCard } from "../src/core/detect/detectors/creditCard.ts";
 import { iban } from "../src/core/detect/detectors/iban.ts";
@@ -97,6 +97,17 @@ describe("shape-preserving digit generators", () => {
     expect(await fakeOf("phone", "+1 (415) 555-2671", "phone")).toMatch(
       /^\+1 \(\d{3}\) \d{3}-\d{4}$/,
     );
+  });
+
+  it("phone replaces separator-less numbers instead of echoing them", async () => {
+    for (const src of ["+14155552671", "+48601234567"]) {
+      const fake = await fakeOf("phone", src, "phone");
+      expect(fake).not.toBe(src);
+      expect(fake).toHaveLength(src.length);
+      expect(fake.slice(0, 2)).toBe(src.slice(0, 2)); // '+' and the country code
+    }
+    const scrubbed = await scrub('{"phone":"+14155552671"}', { config });
+    expect(scrubbed.output).not.toContain("+14155552671");
   });
 
   it("credit-card keeps the brand digit, fixes Luhn, preserves layout", async () => {

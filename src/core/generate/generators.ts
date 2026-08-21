@@ -111,6 +111,11 @@ const pesel: Generate = (ctx) => {
 
 const digit = (f: ReturnType<typeof fakerFor>): string => String(f.number.int({ min: 0, max: 9 }));
 
+// E.164 country codes are 1–3 digits. Separator-less numbers ("+14155552671")
+// give the layout no boundary to stop at, so cap the run: without the cap the
+// whole number counts as country code and the fake reproduces the source.
+const MAX_COUNTRY_CODE_DIGITS = 3;
+
 const phone: Generate = (ctx) => {
   const f = fakerFor(ctx.seed, "en");
   const chars = Array.from(ctx.original);
@@ -119,7 +124,8 @@ const phone: Generate = (ctx) => {
   const keep = new Set<number>();
   const plus = ctx.original.indexOf("+");
   if (plus >= 0) {
-    for (let i = plus + 1; i < chars.length && /\d/.test(chars[i]!); i++) keep.add(i);
+    const limit = Math.min(chars.length, plus + 1 + MAX_COUNTRY_CODE_DIGITS);
+    for (let i = plus + 1; i < limit && /\d/.test(chars[i]!); i++) keep.add(i);
   }
   return chars.map((c, i) => (/\d/.test(c) && !keep.has(i) ? digit(f) : c)).join("");
 };

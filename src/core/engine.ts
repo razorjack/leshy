@@ -60,7 +60,9 @@ export const scrub = async (input: string, ctx: EngineContext): Promise<ScrubRes
     let fake = detector.generate(gctx);
     const free = (f: string): boolean => {
       const owner = used.get(f);
-      return !FORBIDDEN.test(f) && (owner === undefined || owner === normalized);
+      // A fake equal to its source is a leak, not a substitution: reseed.
+      if (f === span.text || FORBIDDEN.test(f)) return false;
+      return owner === undefined || owner === normalized;
     };
     for (let retry = 1; retry <= MAX_RETRIES && !free(fake); retry++) {
       gctx = await makeContext(span.text, span.type, salt, retry);
