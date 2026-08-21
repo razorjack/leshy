@@ -1,0 +1,29 @@
+appId: dev.leshy.desktop
+productName: Leshy
+directories:
+  output: release
+# 180 MB of ONNX weights do not belong in an archive, and a local build gains
+# nothing from one. Keeps dist/ a plain directory inside the bundle.
+asar: false
+npmRebuild: false
+files:
+  - package.json
+  - electron/out/**/*
+  - dist/**/*
+  - "!node_modules/**/*"
+mac:
+  category: public.app-category.developer-tools
+  icon: assets/macos/compiled/Icon.icns
+  extendInfo:
+    CFBundleIconName: Icon
+  extraResources:
+    - from: assets/macos/compiled/Assets.car
+      to: Assets.car
+  target: [dmg]
+linux:
+  category: Development
+  icon: assets/brand/leshy-app-icon-dark-1024.png
+  # Without this the desktop environment cannot link the running window to the
+  # launcher entry (the .desktop name then follows executableName).
+  syncDesktopName: true
+  target: [AppImage]

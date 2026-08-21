@@ -11,6 +11,10 @@ const isolationHeaders = {
   "Cross-Origin-Embedder-Policy": "require-corp",
 };
 
+// The desktop shell serves dist/ itself from app://leshy (adr/0007), so the
+// service worker has nothing to add and no update path it could apply.
+const desktop = process.env["LESHY_DESKTOP"] === "1";
+
 // index.html ships the production CSP; in dev, Vite's HMR websocket needs ws:.
 const devCsp = () => ({
   name: "leshy:dev-csp",
@@ -24,47 +28,51 @@ export default defineConfig({
     svelte(),
     tailwindcss(),
     devCsp(),
-    VitePWA({
-      registerType: "autoUpdate",
-      includeAssets: ["favicon.svg"],
-      manifest: {
-        name: "Leshy",
-        short_name: "Leshy",
-        description:
-          "Scrubs PII out of debugging data before it reaches an LLM. Nothing leaves the woods.",
-        theme_color: "#101b15",
-        background_color: "#101b15",
-        display: "standalone",
-        icons: [
-          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
-          {
-            src: "/icons/maskable-512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
-          },
-        ],
-      },
-      workbox: {
-        globPatterns: ["**/*.{js,mjs,css,html,svg,png,ico,woff2,wasm}"],
-        // ort-wasm artifacts are ~25 MB and essential for offline inference
-        maximumFileSizeToCacheInBytes: 40_000_000,
-        // model weights are fetched on demand and cached at runtime, never precached
-        globIgnores: ["**/models/**"],
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith("/models/"),
-            handler: "CacheFirst",
-            options: {
-              cacheName: "leshy-models",
-              expiration: { maxEntries: 8 },
-              cacheableResponse: { statuses: [0, 200] },
+    ...(desktop
+      ? []
+      : [
+          VitePWA({
+            registerType: "autoUpdate",
+            includeAssets: ["icons/favicon-32.png", "icons/apple-touch-icon-180.png"],
+            manifest: {
+              name: "Leshy",
+              short_name: "Leshy",
+              description:
+                "Scrubs PII out of debugging data before it reaches an LLM. Nothing leaves the woods.",
+              theme_color: "#101b15",
+              background_color: "#101b15",
+              display: "standalone",
+              icons: [
+                { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+                { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+                {
+                  src: "/icons/maskable-512.png",
+                  sizes: "512x512",
+                  type: "image/png",
+                  purpose: "maskable",
+                },
+              ],
             },
-          },
-        ],
-      },
-    }),
+            workbox: {
+              globPatterns: ["**/*.{js,mjs,css,html,svg,png,ico,woff2,wasm}"],
+              // ort-wasm artifacts are ~25 MB and essential for offline inference
+              maximumFileSizeToCacheInBytes: 40_000_000,
+              // model weights are fetched on demand and cached at runtime, never precached
+              globIgnores: ["**/models/**"],
+              runtimeCaching: [
+                {
+                  urlPattern: ({ url }) => url.pathname.startsWith("/models/"),
+                  handler: "CacheFirst",
+                  options: {
+                    cacheName: "leshy-models",
+                    expiration: { maxEntries: 8 },
+                    cacheableResponse: { statuses: [0, 200] },
+                  },
+                },
+              ],
+            },
+          }),
+        ]),
   ]),
   resolve: {
     alias: { $lib: path.resolve("./src/lib") },

@@ -7,3 +7,7 @@ coverage/
 
 # model weights are fetched by scripts/fetch-model.ts, never committed
 public/models/
+
+# desktop shell build output
+electron/out/
+release/

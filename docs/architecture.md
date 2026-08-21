@@ -63,7 +63,7 @@ leshy.config.ts             user detector config (code, bundled into the worker)
 scripts/
   fetch-model.ts            downloads pinned model files → public/models/ (gitignored)
   spike/                    the validation spike, kept as smoke test (npm run spike)
-  icons.ts                  rasterizes the mark → public/icons/*.png (committed)
+  icons.ts                  derives runtime sizes from assets/brand/ → public/icons/
 tests/                      vitest unit tests + shared gold fixtures
 ```
 
@@ -109,6 +109,9 @@ Cross-Origin-Embedder-Policy: require-corp
 
 Required for multithreaded WASM. Serving the CSP as a header (mirroring the meta tag) is
 recommended defence-in-depth.
+
+The desktop shell (adr/0007) is its own host: `electron/main.ts` serves `dist/` from
+`app://leshy` with both headers and the CSP, so no external host is involved.
 
 ## State & UI
 

@@ -4,17 +4,24 @@
   "private": true,
   "description": "Local-first PWA that scrubs PII out of debugging data before it reaches an LLM. Nothing leaves the woods.",
   "license": "MIT",
+  "author": "Jacek Galanciak",
   "type": "module",
+  "main": "electron/out/main.js",
   "scripts": {
     "dev": "vp dev",
     "build": "vp build",
     "preview": "vp preview",
     "test": "vp test",
-    "check": "vp check && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.node.json",
+    "check": "vp check && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.node.json && tsc -p tsconfig.electron.json --noEmit",
     "spike": "node scripts/spike/run.ts",
     "test:e2e": "playwright test",
+    "desktop:build": "LESHY_DESKTOP=1 vp build && tsc -p tsconfig.electron.json",
+    "desktop": "npm run desktop:build && electron .",
+    "desktop:pack": "npm run desktop:build && electron-builder --dir",
+    "desktop:dist": "npm run desktop:build && electron-builder",
     "models:fetch": "node scripts/fetch-model.ts",
     "icons": "node scripts/icons.ts",
+    "icons:macos": "node scripts/macos-icon.ts",
     "prepare": "vp config"
   },
   "dependencies": {
@@ -35,6 +42,8 @@
     "@tailwindcss/vite": "^4.3.2",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^24.0.0",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
     "onnxruntime-node": "^1.23.0",
     "svelte": "^5.56.4",
     "svelte-check": "^4.7.1",
@@ -51,6 +60,7 @@
     "node": "^22.18.0 || >=24.11.0"
   },
   "allowScripts": {
+    "electron": true,
     "onnxruntime-node": true,
     "protobufjs": true
   }

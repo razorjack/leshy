@@ -35,7 +35,10 @@ Node per `.node-version` (24.18.0; mise picks it up automatically). Then:
 npm install               # vp toolchain is a local devDep, nothing global
 npm run models:fetch      # one-time, ~190 MB → public/models/ (gitignored)
 npm run dev / build / preview
-npm run check             # oxfmt + oxlint + type-aware lint + svelte-check + tsc(node)
+npm run desktop           # Electron shell: build + launch (adr/0007)
+npm run desktop:pack      # release/mac-arm64/Leshy.app; :dist makes .dmg / .AppImage
+npm run icons:macos       # regenerate committed Assets.car + ICNS; needs Xcode 26
+npm run check             # oxfmt + oxlint + type-aware lint + svelte-check + tsc
 npm run test              # vitest unit tests (no model needed, CI-safe)
 npm run spike             # full-pipeline validation incl. the real model → must PASS
 ```
@@ -62,10 +65,11 @@ src/core/       pure engine — types.ts is the contract surface, start reading 
 src/worker/     protocol + RPC client real · detect.worker.ts bootstrap stub (step 9)
 src/state/      session.svelte.ts runes store (step 10)
 src/lib/        components (App shell stubs; ui/ = generated shadcn, lint-exempt)
+electron/       desktop shell: main.ts only, serves dist/ from app://leshy (adr/0007)
 leshy.config.ts user detector config — code, statically imported by the worker
 scripts/        fetch-model, icons, spike/ (the validation harness — keep PASSing)
 tests/          vitest + gold fixtures (tests/fixtures/samples.ts)
-docs/           architecture.md · implementation-plan.md · adr/0001–0006
+docs/           architecture.md · implementation-plan.md · adr/0001–0007
 ```
 
 ## Detection model in one paragraph
