@@ -14,9 +14,12 @@ Structure still informs detection, without parsing:
 
 - The **key-value scanner** (`src/core/detect/keyContext.ts`) is one regex pass that
   recognises the pair shapes of JSON, Ruby inspect, Ruby hashes (`:sym => v`), JS object
-  literals and logfmt simultaneously. It yields `{key, value, valueStart, valueEnd}` used
-  by both key-context detection and preserve rules. Unrecognised syntax degrades to "no
-  key hints", never to a failure.
+  literals, logfmt and query strings/cookies simultaneously. It yields
+  `{key, value, valueStart, valueEnd}` used by both key-context detection and preserve
+  rules. An unquoted value ends at the first separator of any of those syntaxes —
+  whitespace, `,`, `}`, `]`, `&`, `;` — so `?email=x&token=y` is two pairs rather than one
+  value swallowing the rest of the URL. Unrecognised syntax degrades to "no key hints",
+  never to a failure.
 - Span boundaries always exclude the quotes: replacing an email inside `"…"` keeps the
   string literal intact.
 

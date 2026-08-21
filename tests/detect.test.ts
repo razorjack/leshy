@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
-import { detect } from "../src/core/engine.ts";
+import { detect, scrub } from "../src/core/engine.ts";
 import { resolveConfig } from "../src/core/config.ts";
+import { scanKeyValues } from "../src/core/detect/keyContext.ts";
 import type { Span } from "../src/core/types.ts";
 import { samples } from "./fixtures/samples.ts";
 
@@ -107,5 +108,27 @@ describe("resolve stage", () => {
       Promise.resolve([semanticSpan(s, "2024-01-02T10:00:00Z", "address")]);
     const spans = await detect(input, { config, semantic });
     expect(touched(spans, input, "2024-01-02T10:00:00Z")).toBe(false);
+  });
+});
+
+describe("key-value scanner", () => {
+  it("ends an unquoted value at a query-string or cookie separator", () => {
+    const kvs = scanKeyValues("GET /users?email=jan@corp.com&token=abc HTTP/1.1");
+    expect(kvs.map((kv) => [kv.key, kv.value])).toEqual([
+      ["email", "jan@corp.com"],
+      ["token", "abc"],
+    ]);
+    const cookie = scanKeyValues("Cookie: session=abc123; user_email=jan@corp.com");
+    expect(cookie.map((kv) => kv.value)).toContain("jan@corp.com");
+    expect(cookie.every((kv) => !kv.value.includes(";"))).toBe(true);
+  });
+
+  it("keeps the surrounding structure intact when scrubbing a query string", async () => {
+    const input = "GET /users?email=jan@corp.com&token=abc HTTP/1.1";
+    const { output } = await scrub(input, { config });
+    expect(output).toContain("&token=");
+    expect(output).not.toContain("jan@corp.com");
+    expect(output.startsWith("GET /users?email=")).toBe(true);
+    expect(output.endsWith(" HTTP/1.1")).toBe(true);
   });
 });

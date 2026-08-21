@@ -15,8 +15,12 @@ export interface KeyValue {
 //   :key => "v"  "key" => "v"    Ruby hash
 //   key: 'v'                     JS object literal
 //   key=v        key="v"         logfmt
+//   ?key=v&key=v                 query string / cookie
+// An unquoted value ends at the first separator of any of those syntaxes; `&`
+// and `;` are in the set so a query string yields one pair per parameter
+// instead of swallowing the rest of the URL into the first value.
 const KV =
-  /(?::([A-Za-z_][A-Za-z0-9_]*)|["']([A-Za-z_][A-Za-z0-9_.-]*)["']|([A-Za-z_][A-Za-z0-9_.-]*))\s*(?:=>|:|=)\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^\s,}\]"']+))/g;
+  /(?::([A-Za-z_][A-Za-z0-9_]*)|["']([A-Za-z_][A-Za-z0-9_.-]*)["']|([A-Za-z_][A-Za-z0-9_.-]*))\s*(?:=>|:|=)\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^\s,;&}\]"']+))/g;
 
 const BARE_LITERAL = /^(?:null|nil|true|false|undefined)$/i;
 
