@@ -146,6 +146,14 @@ describe("shape-preserving digit generators", () => {
     );
   });
 
+  it("api-key keeps no leading characters of a secret with no known prefix", async () => {
+    for (const src of ["hunter2SuperSecret", "MyPrivateKeyValue123"]) {
+      const fake = await fakeOf("api-key", src, "api-key");
+      expect(fake).toHaveLength(src.length);
+      expect(fake.slice(0, 4)).not.toBe(src.slice(0, 4));
+    }
+  });
+
   it("uuid is v4-shaped", async () => {
     const fake = await fakeOf("uuid", "123e4567-e89b-12d3-a456-426614174000", "uuid");
     expect(fake).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);

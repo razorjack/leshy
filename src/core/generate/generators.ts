@@ -212,7 +212,10 @@ const API_PREFIXES = [
 const apiKey: Generate = (ctx) => {
   const f = fakerFor(ctx.seed, "en");
   const src = ctx.original;
-  const prefix = API_PREFIXES.find((p) => src.startsWith(p)) ?? src.slice(0, 4);
+  // Only a recognised vendor prefix survives. Anything else is opaque secret
+  // material — key-context hits ('secret', 'token') have no prefix by
+  // definition, and keeping their first characters leaks the real value.
+  const prefix = API_PREFIXES.find((p) => src.startsWith(p)) ?? "";
   const tail = Array.from(src.slice(prefix.length), (ch) => {
     if (/[0-9]/.test(ch)) return digit(f);
     if (/[A-Z]/.test(ch)) return f.string.alpha({ length: 1, casing: "upper" });

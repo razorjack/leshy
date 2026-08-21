@@ -99,6 +99,11 @@ n values in a paste; the alternative is a persistent registry, rejected below).
   digit as "country code"). `engine.ts` now rejects `fake === span.text` and reseeds, which
   makes "a generator must change its input" an engine invariant rather than a per-generator
   obligation.
+- **Only recognised vendor prefixes survive an api-key fake.** The generator fell back to
+  the source's first four characters when no prefix in its list matched, which leaked the
+  head of every secret caught by key context (`secret`, `token`, `api_key`) — those have no
+  vendor prefix by definition. Unrecognised keys are now replaced whole; `AKIA…`/`ghp_…`
+  keep their prefix so the fake still reads as the kind of credential it replaced.
 - **Person locale from the value alone.** The `GenerateContext` exposes only the matched
   value, so the person generator picks its locale from the value's own diacritics/shape,
   not surrounding context. A diacritic-free Polish name (`Jan Kowalski`) therefore gets an
