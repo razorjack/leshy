@@ -81,8 +81,9 @@ addresses, orgs. `resolve()` filters model noise by rule, merges fragments, appl
 preserve rules (db ids, timestamps, Leshy's own fake namespaces) and settles overlaps by
 precedence tier (500 fake-preserve > 400 validated > 350 preserve > 300 structural >
 200 key-context > 100 semantic), merging same-type overlaps and trimming the rest so
-coverage never shrinks. Validated: 22/22 catches, 0 preserve violations
-(`npm run spike`).
+coverage never shrinks. A validator that only checks plausibility instead of proving
+the match marks its detector `heuristic` and stays at 300. Validated: 22/22 catches, 0
+preserve violations (`npm run spike`).
 
 ## Extending detection (the PESEL-class worked example)
 

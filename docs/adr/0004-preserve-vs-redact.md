@@ -7,14 +7,14 @@ Status: accepted (validated by spike)
 Every span carries a **tier**; overlaps resolve top tier first, and losers are **trimmed
 to their uncovered remainder, never dropped** — total redaction coverage can only grow.
 
-| tier | name          | what sits here                                                   |
-| ---- | ------------- | ---------------------------------------------------------------- |
-| 500  | PRESERVE_FAKE | Leshy's own fake namespaces (ADR-0002) — idempotence             |
-| 400  | VALIDATED     | structural spans whose validator passed (PESEL/Luhn/mod-97/date) |
-| 350  | PRESERVE_RULE | preserve rules: values under id-ish keys, timestamps             |
-| 300  | STRUCTURAL    | regex-only structural matches (email, IP, …)                     |
-| 200  | KEY_CONTEXT   | values under PII-suggesting keys                                 |
-| 100  | SEMANTIC      | model spans                                                      |
+| tier | name          | what sits here                                                       |
+| ---- | ------------- | -------------------------------------------------------------------- |
+| 500  | PRESERVE_FAKE | Leshy's own fake namespaces (ADR-0002) — idempotence                 |
+| 400  | VALIDATED     | structural spans whose validator proved it (checksum, rule, grammar) |
+| 350  | PRESERVE_RULE | preserve rules: values under id-ish keys, timestamps                 |
+| 300  | STRUCTURAL    | regex-only structural matches (email, IP, …)                         |
+| 200  | KEY_CONTEXT   | values under PII-suggesting keys                                     |
+| 100  | SEMANTIC      | model spans                                                          |
 
 The ordering encodes the policy questions:
 
@@ -22,6 +22,11 @@ The ordering encodes the policy questions:
   PRESERVE_RULE (350). A leak costs more than an over-scrub, always.
 - **`user_id=98123` is preserved** even if the model tags it — PRESERVE_RULE beats
   SEMANTIC and KEY_CONTEXT. Debugging value survives.
+- **A plausibility check does not reach VALIDATED.** A validator that only makes a
+  candidate likely rather than proving it declares `heuristic: true`, and its spans stay at
+  STRUCTURAL (300), below preserve rules. Phone's validator counts digits and rejects date
+  shapes, so `{"trace_id": "1234 5678 9012"}` is preserved rather than scrubbed as a phone
+  number, while a checksummed PESEL under an `id` key is still redacted.
 - **A fake from a previous run is never re-scrubbed** — PRESERVE_FAKE beats everything.
 
 ### Semantic noise filters (before tiering; all rule-based, spike-validated)

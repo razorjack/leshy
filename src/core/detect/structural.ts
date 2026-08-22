@@ -17,7 +17,7 @@ export const detectStructural = (input: string, detectors: Detector[]): Span[] =
           detector: d.id,
           source: "structural",
           score: 1,
-          validated: d.validate !== undefined,
+          validated: d.validate !== undefined && d.heuristic !== true,
         });
       }
     } else if (d.kind === "custom") {
@@ -29,7 +29,7 @@ export const detectStructural = (input: string, detectors: Detector[]): Span[] =
           detector: d.id,
           source: "structural",
           score: 1,
-          validated: d.validate !== undefined,
+          validated: d.validate !== undefined && d.heuristic !== true,
         });
       }
     }

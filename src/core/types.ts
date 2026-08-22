@@ -124,9 +124,16 @@ export interface StructuralDetector extends DetectorBase {
   match: RegExp;
   /**
    * Rejects false candidates (Luhn, mod-97, PESEL checksum…). A passing
-   * validator promotes the span to TIER.VALIDATED.
+   * validator promotes the span to TIER.VALIDATED unless `heuristic` is set.
    */
   validate?: (candidate: string, input: string, start: number) => boolean;
+  /**
+   * Set when validate() only makes a candidate plausible (a digit count, a
+   * length) instead of proving it. Such a span stays at TIER.STRUCTURAL, so
+   * preserve rules still beat it — otherwise a grouped `trace_id` would be
+   * scrubbed as a phone number (ADR-0004).
+   */
+  heuristic?: boolean;
 }
 
 /** Zero-shot labels resolved by the GLiNER model. */
@@ -152,6 +159,8 @@ export interface CustomDetector extends DetectorBase {
   kind: "custom";
   match: (input: string) => Array<Pick<Span, "start" | "end" | "text">>;
   validate?: (candidate: string, input: string, start: number) => boolean;
+  /** See StructuralDetector.heuristic. */
+  heuristic?: boolean;
 }
 
 export type Detector = StructuralDetector | SemanticDetector | KeyDetector | CustomDetector;

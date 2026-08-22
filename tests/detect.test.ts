@@ -58,6 +58,14 @@ describe("resolve stage", () => {
     expect(covered(spans, input, "44051401359")).toBe(true);
   });
 
+  it("keeps a grouped id under a preserve key (phone's validator is heuristic)", async () => {
+    for (const input of ['{"trace_id":"1234 5678 9012"}', '{"order_id":"123 456 7890"}']) {
+      expect((await scrub(input, { config })).output).toBe(input);
+    }
+    // a decisive validator still outranks the preserve rule
+    expect((await scrub('{"id":"44051401359"}', { config })).output).not.toContain("44051401359");
+  });
+
   it("suppresses semantic hits on ids under preserve keys", async () => {
     const input = 'user_id=98123 msg="ok"';
     const semantic = (s: string) => Promise.resolve([semanticSpan(s, "98123", "person")]);

@@ -13,6 +13,9 @@ export const phone: StructuralDetector = {
   match:
     /(?<![\d/.-])(?:\+\d{1,3}[ .-]?)?(?:\(\d{1,4}\)[ .-]?)?\d{2,4}(?:[ .-]\d{2,4}){1,4}(?![\d/.-])|(?<![\d/.:-])\+\d{7,15}(?![\d/.:-])/g,
   keys: /phone|mobile|cell|(?:^|_)tel(?:$|_)/i,
+  // Digit counts and date/time shapes only make a candidate plausible, so a
+  // match does not outrank preserve rules — a grouped `trace_id` stays put.
+  heuristic: true,
   validate: (text, input, start) => {
     const digits = text.replace(/\D/g, "");
     if (digits.length < 9 || digits.length > 15) return false;
