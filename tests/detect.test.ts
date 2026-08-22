@@ -113,6 +113,14 @@ describe("resolve stage", () => {
     expect(replacements).toHaveLength(1);
   });
 
+  it("stays fast on a large span set (was quadratic: 30 s for 460 KB)", async () => {
+    const line = '{"id":42,"email":"jan@corp.com","ip":"10.0.0.5"}';
+    const input = Array.from({ length: 4000 }, () => line).join("\n");
+    const spans = await detect(input, { config });
+    expect(spans).toHaveLength(8000); // email + ip per line, ids preserved
+    for (const s of spans) expect(input.slice(s.start, s.end)).toBe(s.text);
+  });
+
   it("keeps timestamps out of results even when tagged by the model", async () => {
     const input = "seen 2024-01-02T10:00:00Z at gate";
     const semantic = (s: string) =>

@@ -79,6 +79,12 @@ The ordering encodes the policy questions:
   `?email=…&token=abc` turned `&token=abc` into an email address. Merging settles the
   same-type case; trim-not-drop still governs spans of different types, where the remainder
   genuinely is a different entity and redacting it is the point.
+- **Region sets are indexed, not scanned.** Every stage of `resolve()` asks "does this span
+  hit that set of ranges?" once per span, and each answered by scanning its whole set, so
+  the stage was quadratic in span count: a 460 KB paste spent 26.7 s of its 29.6 s in
+  resolve. The preserve, fake-namespace, corroboration and already-chosen sets are now
+  sorted, merged once and queried by binary search — same result, 29 ms on that input.
+  Tier semantics are unchanged; only the lookup is.
 - **`fake-mac` and `fake-ipv6` preserve rules added** to complete the idempotence
   namespaces ADR-0002 already names. Accepted recall cost, per ADR-0002's namespace
   choice: a _real_ locally-administered MAC (second nibble 2/6/A/E) under a MAC key is

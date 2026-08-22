@@ -14,8 +14,62 @@ const TIMESTAMP_SHAPE =
 export const spanTier = (s: Span, override?: number): number =>
   override ?? (s.validated ? TIER.VALIDATED : SOURCE_TIER[s.source]);
 
-const overlaps = (a: { start: number; end: number }, b: { start: number; end: number }): boolean =>
-  a.start < b.end && a.end > b.start;
+interface Range {
+  start: number;
+  end: number;
+}
+
+/**
+ * Sorted non-overlapping ranges, queried by binary search. Every stage below
+ * asks "does this span hit that set of ranges?" once per span; scanning the set
+ * makes resolve() quadratic, and a large paste produces tens of thousands of
+ * spans (a 460 KB log took ~30 s before this).
+ */
+const sortMerged = (ranges: Range[]): Range[] => {
+  const out: Range[] = [];
+  for (const r of [...ranges].sort((a, b) => a.start - b.start)) {
+    const last = out[out.length - 1];
+    if (last !== undefined && r.start <= last.end) last.end = Math.max(last.end, r.end);
+    else out.push({ start: r.start, end: r.end });
+  }
+  return out;
+};
+
+/** Index of the first range ending after `pos` — the only one that can hit it. */
+const seek = (ranges: Range[], pos: number): number => {
+  let lo = 0;
+  let hi = ranges.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (ranges[mid]!.end <= pos) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+};
+
+const hits = (ranges: Range[], span: Range): boolean => {
+  const r = ranges[seek(ranges, span.start)];
+  return r !== undefined && r.start < span.end;
+};
+
+/** `span` minus every range in `taken`, left to right. */
+const subtract = (taken: Range[], span: Range): Range[] => {
+  const out: Range[] = [];
+  let cursor = span.start;
+  for (let i = seek(taken, span.start); i < taken.length && taken[i]!.start < span.end; i++) {
+    const t = taken[i]!;
+    if (t.start > cursor) out.push({ start: cursor, end: t.start });
+    cursor = Math.max(cursor, t.end);
+    if (cursor >= span.end) return out;
+  }
+  if (cursor < span.end) out.push({ start: cursor, end: span.end });
+  return out;
+};
+
+/** Insert a range known not to overlap anything already in `taken`. */
+const take = (taken: Range[], r: Range): void => {
+  taken.splice(seek(taken, r.start), 0, r);
+};
 
 /**
  * Merge same-type spans that describe one entity, in two shapes:
@@ -80,15 +134,16 @@ export const resolve = (
   const keyValues = kvs ?? scanKeyValues(input);
   const activePreserve = preserve.filter((r) => r.enabled);
 
-  const preserveRegions: Array<{ start: number; end: number }> = [];
+  const preserved: Range[] = [];
   for (const rule of activePreserve) {
     if (!rule.keys) continue;
     for (const kv of keyValues) {
       if (rule.keys.test(kv.key) && (!rule.match || rule.match.test(kv.value))) {
-        preserveRegions.push({ start: kv.valueStart, end: kv.valueEnd });
+        preserved.push({ start: kv.valueStart, end: kv.valueEnd });
       }
     }
   }
+  const preserveRegions = sortMerged(preserved);
 
   // Corroboration applies to types the model does NOT own: when no semantic
   // detector claims a type (email, phone, ip…), a lone model guess of that
@@ -103,6 +158,7 @@ export const resolve = (
       .map((d) => d.type),
   );
   const structural = rawSpans.filter((s) => s.source === "structural");
+  const structuralRegions = sortMerged(structural);
 
   let semantic = rawSpans.filter((s) => s.source === "semantic");
   semantic = semantic.filter((s) => {
@@ -110,7 +166,7 @@ export const resolve = (
     if (TIMESTAMP_SHAPE.test(s.text) || /^\d+$/.test(s.text)) return false;
     // a span in key position (right before : | => | =) names a field, not a value
     if (/^["']?\s*(?::|=>|=)/.test(input.slice(s.end, s.end + 5))) return false;
-    if (corroborated.has(s.type)) return structural.some((st) => overlaps(st, s));
+    if (corroborated.has(s.type)) return hits(structuralRegions, s);
     return true;
   });
 
@@ -123,17 +179,18 @@ export const resolve = (
   // just self-drops: the whole matched span is protected so a re-scrub is a
   // no-op even when the model tags a fragment of a fake (a fake email's local
   // part reads as a person/org). This is what makes idempotence hold (adr/0002).
-  const fakeRegions = spans.filter((s) => activePreserve.some((r) => r.isFake?.(s.text)));
-  spans = spans.filter((s) => !fakeRegions.some((f) => overlaps(s, f)));
+  const fakeRegions = sortMerged(
+    spans.filter((s) => activePreserve.some((r) => r.isFake?.(s.text))),
+  );
+  spans = spans.filter((s) => !hits(fakeRegions, s));
 
   // preserve rules beat everything below TIER.VALIDATED
-  spans = spans.filter(
-    (s) => spanTier(s) >= TIER.VALIDATED || !preserveRegions.some((r) => overlaps(s, r)),
-  );
+  spans = spans.filter((s) => spanTier(s) >= TIER.VALIDATED || !hits(preserveRegions, s));
 
   const order = new Map(detectors.map((d, i) => [d.id, i]));
   const rank = (s: Span): number => order.get(s.detector) ?? detectors.length;
   const chosen: Span[] = [];
+  const taken: Range[] = [];
   const sorted = spans.sort(
     (a, b) =>
       spanTier(b) - spanTier(a) ||
@@ -142,19 +199,11 @@ export const resolve = (
       a.start - b.start,
   );
   for (const s of sorted) {
-    let pieces = [{ start: s.start, end: s.end }];
-    for (const c of chosen) {
-      pieces = pieces.flatMap((p) => {
-        if (!overlaps(p, c)) return [p];
-        const rest: Array<{ start: number; end: number }> = [];
-        if (p.start < c.start) rest.push({ start: p.start, end: c.start });
-        if (c.end < p.end) rest.push({ start: c.end, end: p.end });
-        return rest;
-      });
-    }
-    for (const p of pieces) {
+    for (const p of subtract(taken, s)) {
       const text = input.slice(p.start, p.end);
-      if (/[\p{L}\p{N}]/u.test(text)) chosen.push({ ...s, start: p.start, end: p.end, text });
+      if (!/[\p{L}\p{N}]/u.test(text)) continue;
+      chosen.push({ ...s, start: p.start, end: p.end, text });
+      take(taken, p);
     }
   }
   return chosen.sort((a, b) => a.start - b.start);
