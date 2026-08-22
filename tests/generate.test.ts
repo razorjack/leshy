@@ -225,6 +225,14 @@ describe("semantic generators", () => {
     expect(emailLocal).toContain(last!);
   });
 
+  it("links a person to their email in a pl locale too", async () => {
+    // same personSeed, so the locale must resolve the same on both sides
+    const person = await fakeOf("person", "\u0141ukasz Nowak", "person");
+    const emailLocal = (await fakeOf("email", "\u0142ukasz.nowak@x.com", "email")).split("@")[0]!;
+    const [first, last] = person.toLowerCase().split(" ");
+    expect(emailLocal).toBe(`${first}.${last}`);
+  });
+
   it("is deterministic (fixed salt ⇒ exact strings)", async () => {
     expect(await fakeOf("person", "Jan Kowalski", "person")).toBe("Shelley Stiedemann");
     expect(await fakeOf("org", "Acme Sp. z o.o.", "org")).toBe(

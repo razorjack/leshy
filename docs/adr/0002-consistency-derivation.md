@@ -104,7 +104,10 @@ n values in a paste; the alternative is a persistent registry, rejected below).
   head of every secret caught by key context (`secret`, `token`, `api_key`) — those have no
   vendor prefix by definition. Unrecognised keys are now replaced whole; `AKIA…`/`ghp_…`
   keep their prefix so the fake still reads as the kind of credential it replaced.
-- **Person locale from the value alone.** The `GenerateContext` exposes only the matched
-  value, so the person generator picks its locale from the value's own diacritics/shape,
-  not surrounding context. A diacritic-free Polish name (`Jan Kowalski`) therefore gets an
-  `en` fake — linkage, not Polishness, is the invariant the fixtures assert.
+- **Person locale from the name tokens.** The `GenerateContext` exposes only the matched
+  value, so locale still comes from the name itself rather than surrounding context: a
+  diacritic-free Polish name (`Jan Kowalski`) gets an `en` fake. It is resolved from the
+  same token sequence the person seed is, though. Reading it off the raw value instead
+  handed one shared `personSeed` to two different faker locales, so `Łukasz Nowak` and
+  `łukasz.nowak@…` — same seed — became two different people. Linkage, not Polishness, is
+  the invariant the fixtures assert.

@@ -25,13 +25,21 @@ export const personParts = (seed: number, locale: Locale): PersonParts => {
   return { first: f.person.firstName(), last: f.person.lastName() };
 };
 
+/**
+ * Locale for a name, resolved from the same token sequence the person seed is.
+ * A person and their linked email share a seed; resolving the locale from the
+ * value instead would hand the same seed to two different faker locales and
+ * produce two different people (adr/0002 linked identities).
+ */
+const nameLocale = (tokens: string[]): Locale => localeFor(tokens.join(" "));
+
 const email: Generate = (ctx) => {
   const at = ctx.original.lastIndexOf("@");
   const localRaw = at > 0 ? ctx.original.slice(0, at) : ctx.original;
   const tokens = nameTokens(localRaw);
   let local: string;
   if (tokens) {
-    const { first, last } = personParts(ctx.personSeed(tokens), "en");
+    const { first, last } = personParts(ctx.personSeed(tokens), nameLocale(tokens));
     local = tokens.length > 1 ? `${first}.${last}` : first;
   } else {
     local = fakerFor(ctx.seed, "en").internet.username();
@@ -237,9 +245,9 @@ const matchCase = (fake: string, src: string): string => {
 };
 
 const person: Generate = (ctx) => {
-  const locale = localeFor(ctx.original);
-  const seed = ctx.personSeed(nameTokens(ctx.original) ?? [ctx.normalized]);
-  const { first, last } = personParts(seed, locale); // first two draws link to email
+  const tokens = nameTokens(ctx.original) ?? [ctx.normalized];
+  const locale = nameLocale(tokens);
+  const { first, last } = personParts(ctx.personSeed(tokens), locale); // links to email
   const words = ctx.original.split(/\s+/).filter(Boolean);
   let names: string[];
   if (words.length <= 1) names = [first];
