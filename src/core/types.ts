@@ -9,6 +9,9 @@ export type EntityType =
   | "person"
   | "org"
   | "address"
+  | "street"
+  | "city"
+  | "postcode"
   | "email"
   | "phone"
   | "ip"
@@ -135,6 +138,15 @@ export interface SemanticDetector extends DetectorBase {
   threshold?: number;
 }
 
+/**
+ * Matched only by `keys` — no text pattern of its own. Address components
+ * (`city`, `zip`) have no recognisable shape outside the field that names them.
+ */
+export interface KeyDetector extends DetectorBase {
+  kind: "key";
+  keys: RegExp;
+}
+
 /** Arbitrary matching logic for cases regex can't express. */
 export interface CustomDetector extends DetectorBase {
   kind: "custom";
@@ -142,7 +154,7 @@ export interface CustomDetector extends DetectorBase {
   validate?: (candidate: string, input: string, start: number) => boolean;
 }
 
-export type Detector = StructuralDetector | SemanticDetector | CustomDetector;
+export type Detector = StructuralDetector | SemanticDetector | KeyDetector | CustomDetector;
 
 /**
  * Preserve rules mark ranges that must NOT be scrubbed. They beat key-context

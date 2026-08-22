@@ -190,6 +190,25 @@ describe("semantic generators", () => {
     expect(en).not.toMatch(/\d{2}-\d{3}/);
   });
 
+  it("address components stay their own kind under component keys", async () => {
+    const { output } = await scrub('{"street":"Main St","city":"Warszawa","zip":"00-624"}', {
+      config,
+    });
+    const parsed = JSON.parse(output) as Record<string, string>;
+    expect(parsed["street"]).not.toContain(",");
+    expect(parsed["city"]).not.toMatch(/\d/);
+    expect(parsed["zip"]).toMatch(/^\d{2}-\d{3}$/);
+    expect(Object.values(parsed)).not.toContain("Warszawa");
+  });
+
+  it("postcode keeps the source shape whatever the country", async () => {
+    expect(await fakeOf("postcode", "SW1A 1AA", "postcode")).toMatch(
+      /^[A-Z]{2}\d[A-Z] \d[A-Z]{2}$/,
+    );
+    expect(await fakeOf("postcode", "97477-1234", "postcode")).toMatch(/^\d{5}-\d{4}$/);
+    expect(await fakeOf("postcode", "00-624", "postcode")).toMatch(/^\d{2}-\d{3}$/);
+  });
+
   it("org keeps the legal suffix verbatim, fakes the name", async () => {
     const pl = await fakeOf("org", "Acme Sp. z o.o.", "org");
     expect(pl.endsWith("Sp. z o.o.")).toBe(true);

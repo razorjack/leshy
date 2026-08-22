@@ -261,6 +261,23 @@ const address: Generate = (ctx) => {
   return `${f.location.streetAddress()}, ${f.location.city()}, ${f.location.state({ abbreviated: true })} ${f.location.zipCode()}`;
 };
 
+const street: Generate = (ctx) =>
+  fakerFor(ctx.seed, localeFor(ctx.original)).location.streetAddress();
+
+const city: Generate = (ctx) => fakerFor(ctx.seed, localeFor(ctx.original)).location.city();
+
+// A postal code is a formatted code, not prose. Swapping digit for digit and
+// letter for letter keeps every country's shape (00-624, SW1A 1AA, 97477-1234)
+// without having to know which country it belongs to.
+const postcode: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  return Array.from(ctx.original, (ch) => {
+    if (/\d/.test(ch)) return digit(f);
+    if (!/\p{L}/u.test(ch)) return ch;
+    return f.string.alpha({ length: 1, casing: ch === ch.toLowerCase() ? "lower" : "upper" });
+  }).join("");
+};
+
 // Legal suffixes kept verbatim; only the company name is faked (adr/0002).
 const ORG_SUFFIX =
   /\s+(Sp\.\s*z\s*o\.\s*o\.|S\.A\.|Sp\.\s*j\.|Sp\.\s*k\.|GmbH|AG|Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|B\.V\.|Oy|AB|Pty\s+Ltd\.?)\s*$/i;
@@ -291,5 +308,8 @@ export const generators = {
   uuid,
   person,
   address,
+  street,
+  city,
+  postcode,
   org,
 } satisfies Record<string, Generate>;

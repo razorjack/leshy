@@ -11,7 +11,7 @@ import { uuid } from "./uuid.ts";
 import { ssn } from "./ssn.ts";
 import { pesel } from "./pesel.ts";
 import { person } from "./person.ts";
-import { address, plAddress } from "./address.ts";
+import { address, city, plAddress, postcode, street } from "./address.ts";
 import { org } from "./org.ts";
 
 /** Declaration order is the tie-break for equal-tier, equal-length overlaps. */
@@ -30,6 +30,9 @@ export const builtins: Detector[] = [
   uuid,
   plAddress,
   person,
+  street,
+  city,
+  postcode,
   address,
   org,
 ];

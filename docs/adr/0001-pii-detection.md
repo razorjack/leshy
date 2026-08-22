@@ -96,3 +96,17 @@ with no key hints (7 catches, 1 preserve), incl. Polish freeform log/exception t
 - Non-Polish/English languages: untested; mT5 transfer may help but is unverified.
 - Inputs longer than the model's 384-token window need chunking (implementation-plan
   step 8) — until then the worker must chunk or the tail of a long paste is unscanned.
+
+## Implementation notes
+
+- **A fourth detector kind, `key`.** Layer 2 originally rode on structural or semantic
+  declarations, both of which carry a pattern of their own. Address components do not:
+  `city`, `zip` and `street` are recognisable only by the field that names them.
+  `KeyDetector` (`kind: 'key'`) declares `keys` and a generator, nothing else.
+- **Address components generate their own kind of value.** A single `address` detector
+  claimed the component keys while its generator only builds complete addresses, so
+  `"zip": "00-624"` became a whole street address and `"postcode": "SW1A 1AA"` became a US
+  one. `street`, `city` and `postcode` are now separate detectors, declared before
+  `address` so the keyed lookup prefers the narrower match. Postal codes are generated
+  shape-preserving — digit for digit, letter for letter — which keeps every country's
+  format without needing a country table.

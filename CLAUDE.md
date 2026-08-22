@@ -110,7 +110,8 @@ export default defineConfig({
 
 Same shape for built-ins: one file in `src/core/detect/detectors/` + registry line +
 fixture lines in tests. Semantic entities are a label string on a `kind: 'semantic'`
-detector — no model work.
+detector — no model work. A field recognisable only by its name (`city`, `zip`) is a
+`kind: 'key'` detector: `keys` plus `generate`, no pattern.
 
 ## Code conventions
 
