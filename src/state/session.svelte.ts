@@ -43,6 +43,8 @@ class Session {
     if (this.timer) clearTimeout(this.timer);
     if (value.trim() === "") {
       this.token++; // cancel any in-flight response
+      this.worker?.cancel(); // …and settle its promise
+      this.running = false;
       this.output = "";
       this.replacements = [];
       this.stage = "idle";

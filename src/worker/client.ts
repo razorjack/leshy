@@ -38,16 +38,21 @@ export class ScrubWorker {
     this.post({ id: this.nextId++, kind: "warmup" });
   }
 
+  /**
+   * Settle the outstanding scrub promise. The worker coalesces to the latest
+   * request and never replies to a dropped one, so an unsettled promise would
+   * hold its caller's continuation for the lifetime of the page.
+   */
+  cancel(): void {
+    if (this.lastScrubId === undefined) return;
+    const prev = this.pending.get(this.lastScrubId);
+    this.pending.delete(this.lastScrubId);
+    this.lastScrubId = undefined;
+    prev?.reject(new Error("superseded"));
+  }
+
   scrub(input: string, overrides?: ScrubOverrides): Promise<ScrubResult> {
-    // Supersede the previous scrub: the worker coalesces to the latest and never
-    // replies to the dropped one, so settle its promise here to avoid a leak.
-    if (this.lastScrubId !== undefined) {
-      const prev = this.pending.get(this.lastScrubId);
-      if (prev) {
-        this.pending.delete(this.lastScrubId);
-        prev.reject(new Error("superseded"));
-      }
-    }
+    this.cancel();
     const id = this.nextId++;
     this.lastScrubId = id;
     return new Promise((resolve, reject) => {
