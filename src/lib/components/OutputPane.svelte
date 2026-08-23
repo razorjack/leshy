@@ -9,13 +9,19 @@
   const segments = $derived(splitOutput(session.output, session.replacements))
   const hasOutput = $derived(session.output.length > 0)
 
-  let copied = $state(false)
+  // The Clipboard API rejects when the permission is denied or the document is
+  // not focused; say so on the button rather than failing silently.
+  let copyState = $state<'idle' | 'copied' | 'failed'>('idle')
   let copyTimer: ReturnType<typeof setTimeout> | undefined
   const copy = async (): Promise<void> => {
-    await navigator.clipboard.writeText(session.output)
-    copied = true
+    try {
+      await navigator.clipboard.writeText(session.output)
+      copyState = 'copied'
+    } catch {
+      copyState = 'failed'
+    }
     clearTimeout(copyTimer)
-    copyTimer = setTimeout(() => (copied = false), 1600)
+    copyTimer = setTimeout(() => (copyState = 'idle'), 1600)
   }
 </script>
 
@@ -24,7 +30,7 @@
     <h2 class="text-xs font-medium uppercase tracking-widest text-muted-foreground">Scrubbed</h2>
     {#if hasOutput}
       <Button variant="ghost" size="sm" class="-my-1 h-7 text-xs" onclick={copy}>
-        {copied ? 'Copied' : 'Copy'}
+        {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
       </Button>
     {/if}
   </div>
