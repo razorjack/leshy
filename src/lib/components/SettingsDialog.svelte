@@ -46,6 +46,14 @@
     apply()
   })
 
+  // Typing a salt would otherwise re-scrub (model pass included) per keystroke.
+  let saltTimer: ReturnType<typeof setTimeout> | undefined
+  const setSalt = (value: string): void => {
+    salt = value
+    clearTimeout(saltTimer)
+    saltTimer = setTimeout(apply, 300)
+  }
+
   const setDetector = (id: string, value: boolean): void => {
     enabled[id] = value
     apply()
@@ -75,10 +83,7 @@
           value={salt}
           placeholder="leshy-v1 (default)"
           class="rounded-md border border-input bg-transparent px-3 py-1.5 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          oninput={(e) => {
-            salt = e.currentTarget.value
-            apply()
-          }}
+          oninput={(e) => setSalt(e.currentTarget.value)}
         />
         <span class="text-xs text-muted-foreground">Changes every fake deterministically.</span>
       </label>
