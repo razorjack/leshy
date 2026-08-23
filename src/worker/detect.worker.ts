@@ -48,10 +48,19 @@ const loadGliner = async (): Promise<Gliner> => {
 };
 
 const getGliner = (): Promise<Gliner> =>
-  (glinerPromise ??= loadGliner().then((g) => {
-    glinerReady = true;
-    return g;
-  }));
+  (glinerPromise ??= loadGliner().then(
+    (g) => {
+      glinerReady = true;
+      return g;
+    },
+    (e: unknown) => {
+      // Forget the failure so the next scrub retries. Caching the rejected
+      // promise would disable the model until the page reloads, even when the
+      // cause was a cold cache or a dropped connection.
+      glinerPromise = undefined;
+      throw e;
+    },
+  ));
 
 /** Fold serialisable UI overrides over the code-defined config (adr/0006). */
 const configFor = (o: ScrubOverrides | undefined): ResolvedConfig => {
