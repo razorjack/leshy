@@ -60,7 +60,8 @@ vite-plugin-pwa. Scripts run on Node's native type stripping — relative import
 ```
 src/core/       pure engine — types.ts is the contract surface, start reading there
   detect/       structural + key-context + semantic layers, resolve (tiers, ADR-0004)
-  generate/     derivation + generators (stubs with contracts — plan steps 1–5)
+  packs/        country packs: rules that only apply inside one country (ADR-0008)
+  generate/     derivation + generators (locales.ts lists what Leshy generates in)
   engine.ts     detect() real · scrub() stub (plan step 6)
 src/worker/     protocol + RPC client real · detect.worker.ts bootstrap stub (step 9)
 src/state/      session.svelte.ts runes store (step 10)
@@ -114,6 +115,11 @@ fixture lines in tests. Semantic entities are a label string on a `kind: 'semant
 detector — no model work. A field recognisable only by its name (`city`, `zip`) is a
 `kind: 'key'` detector: `keys` plus `generate`, no pattern.
 
+A detector that only means something inside one country (a national id, a local address
+grammar) goes in `src/core/packs/<iso2>/` with a `CountryPack` manifest and one line in
+`packs/index.ts` — never in the always-on `detectors/` list (ADR-0008). All packs load
+unless `countries` says otherwise.
+
 ## Code conventions
 
 - Names: as short as possible while unambiguous — `detectByKey` not
@@ -133,5 +139,6 @@ detector — no model work. A field recognisable only by its name (`city`, `zip`
 Why GLiNER / thresholds / fallbacks → adr/0001 · fake derivation & idempotence →
 adr/0002 · why no parsers → adr/0003 · preserve-vs-redact tiers → adr/0004 · palette,
 type, the eye → adr/0005 · toolchain quirks (amaro regex bug, tsgolint limits,
-allowScripts) → adr/0006 · module boundaries & worker contract → architecture.md ·
+allowScripts) → adr/0006 · desktop shell → adr/0007 · country packs & locales →
+adr/0008 · module boundaries & worker contract → architecture.md ·
 what to build next → implementation-plan.md.

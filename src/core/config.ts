@@ -6,6 +6,7 @@ import type {
   SemanticConfig,
 } from "./types.ts";
 import { builtins } from "./detect/detectors/index.ts";
+import { packs } from "./packs/index.ts";
 import { defaultPreserve } from "./preserve.ts";
 import { DEFAULT_MODEL } from "./detect/semantic/models.ts";
 
@@ -18,6 +19,8 @@ export const DEFAULT_THRESHOLD = 0.35;
 export const defineConfig = (config: LeshyConfig): LeshyConfig => config;
 
 export interface ResolvedConfig {
+  /** Ids of the country packs whose detectors are in `detectors`. */
+  countries: string[];
   detectors: Detector[];
   preserve: PreserveRule[];
   salt: string;
@@ -28,12 +31,18 @@ export interface ResolvedConfig {
 export const resolveConfig = (config: LeshyConfig = {}): ResolvedConfig => {
   const disabled = new Set(config.disable ?? []);
   const enabled = new Set(config.enable ?? []);
-  const detectors = [...builtins, ...(config.detectors ?? [])].map((d) => {
+  const wanted = config.countries;
+  const selected = wanted === undefined ? packs : packs.filter((p) => wanted.includes(p.id));
+  // Packs first: their national-id checksums are the most specific rules in the
+  // list, and declaration order breaks equal-tier ties (adr/0004).
+  const all = [...selected.flatMap((p) => p.detectors), ...builtins, ...(config.detectors ?? [])];
+  const detectors = all.map((d) => {
     if (disabled.has(d.id)) return { ...d, enabled: false };
     if (enabled.has(d.id)) return { ...d, enabled: true };
     return d;
   });
   return {
+    countries: selected.map((p) => p.id),
     detectors,
     preserve: [...defaultPreserve, ...(config.preserve ?? [])],
     salt: config.salt ?? DEFAULT_SALT,

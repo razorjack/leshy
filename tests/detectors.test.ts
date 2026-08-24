@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 import { detectStructural } from "../src/core/detect/structural.ts";
-import { builtins } from "../src/core/detect/detectors/index.ts";
-import { peselChecksum, isFakePesel } from "../src/core/detect/detectors/pesel.ts";
+import { resolveConfig } from "../src/core/config.ts";
+import { peselChecksum, isFakePesel } from "../src/core/packs/pl/pesel.ts";
 
-const types = (input: string): string[] =>
-  [...new Set(detectStructural(input, builtins).map((s) => s.type))].sort();
+const all = resolveConfig().detectors;
+
+const types = (input: string, detectors = all): string[] =>
+  [...new Set(detectStructural(input, detectors).map((s) => s.type))].sort();
 
 describe("structural detectors", () => {
   it("matches emails", () => {
@@ -80,5 +82,24 @@ describe("fake namespaces (idempotence)", () => {
     const fake = digits.slice(0, 10) + String(check);
     expect(isFakePesel(fake)).toBe(true);
     expect(isFakePesel("44051401359")).toBe(false);
+  });
+});
+
+describe("country packs", () => {
+  it("are all loaded by default", () => {
+    expect(resolveConfig().countries).toEqual(["pl", "us"]);
+  });
+
+  it("take their detectors with them when deselected", () => {
+    const us = resolveConfig({ countries: ["us"] }).detectors;
+    expect(us.map((d) => d.id)).not.toContain("pesel");
+    expect(types("pesel 44051401359", us)).not.toContain("pesel");
+    expect(types("ssn 123-45-6789", us)).toContain("ssn");
+  });
+
+  it("leave the country-neutral detectors alone", () => {
+    const none = resolveConfig({ countries: [] }).detectors;
+    expect(types("contact: jan@corp.com", none)).toContain("email");
+    expect(types("from 10.0.0.5", none)).toContain("ip");
   });
 });

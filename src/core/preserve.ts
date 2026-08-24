@@ -1,5 +1,5 @@
 import type { PreserveRule } from "./types.ts";
-import { isFakePesel } from "./detect/detectors/pesel.ts";
+import { isFakePesel } from "./packs/pl/pesel.ts";
 
 const TIMESTAMP =
   /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|\s?[+-]\d{2}:?\d{2})?)?$/;

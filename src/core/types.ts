@@ -196,6 +196,23 @@ export interface PreserveRule {
   enabled: boolean;
 }
 
+/**
+ * A country's detection rules, selected as a unit. Country-neutral detectors
+ * (email, IBAN, card, IP) are always on; anything that only makes sense inside
+ * one country's documents — a national id, a local address grammar — belongs to
+ * a pack, so a user in São Paulo is not carrying Polish rules by default and a
+ * user in Berlin can have German ones.
+ */
+export interface CountryPack {
+  /** ISO 3166-1 alpha-2, lowercase: 'pl', 'us'. */
+  id: string;
+  /** Country name, shown in the settings picker. */
+  label: string;
+  /** The locale that pairs with this country, offered alongside it in the UI. */
+  locale: Locale;
+  detectors: Detector[];
+}
+
 /** A named locale, or per-value detection. */
 export type LocaleSetting = Locale | "auto";
 
@@ -216,6 +233,11 @@ export interface LeshyConfig {
   disable?: DetectorId[];
   /** Off-by-default built-ins to enable (e.g. 'uuid'). */
   enable?: DetectorId[];
+  /**
+   * Country packs to load, by id. Defaults to all of them: an unexpected
+   * national id over-scrubs, a missing one leaks (recall first).
+   */
+  countries?: string[];
   /** Extra preserve rules. */
   preserve?: PreserveRule[];
   /**

@@ -8,16 +8,16 @@ import { iban } from "./iban.ts";
 import { jwt } from "./jwt.ts";
 import { apiKey } from "./apiKey.ts";
 import { uuid } from "./uuid.ts";
-import { ssn } from "./ssn.ts";
-import { pesel } from "./pesel.ts";
 import { person } from "./person.ts";
-import { address, city, plAddress, postcode, street } from "./address.ts";
+import { address, city, postcode, street } from "./address.ts";
 import { org } from "./org.ts";
 
-/** Declaration order is the tie-break for equal-tier, equal-length overlaps. */
+/**
+ * Country-neutral detectors, always on. Anything that only makes sense inside
+ * one country's document lives in a pack (src/core/packs). Declaration order is
+ * the tie-break for equal-tier, equal-length overlaps.
+ */
 export const builtins: Detector[] = [
-  pesel,
-  ssn,
   creditCard,
   iban,
   jwt,
@@ -28,7 +28,6 @@ export const builtins: Detector[] = [
   ipv4,
   phone,
   uuid,
-  plAddress,
   person,
   street,
   city,
