@@ -1,6 +1,6 @@
 import type { Generate } from "../types.ts";
 import { fakerFor } from "./faker.ts";
-import type { Locale } from "./locales.ts";
+import { LOCALES, type Locale, locales } from "./locales.ts";
 import { nameTokens } from "./derive.ts";
 
 /**
@@ -260,10 +260,14 @@ const person: Generate = (ctx) => {
 const address: Generate = (ctx) => {
   const locale = ctx.localeFor();
   const f = fakerFor(ctx.seed, locale);
-  if (locale === "pl") {
-    return `${f.location.streetAddress()}, ${f.location.zipCode()} ${f.location.city()}`;
+  switch (LOCALES[locale].addressOrder) {
+    case "city-state-zip":
+      return `${f.location.streetAddress()}, ${f.location.city()}, ${f.location.state({ abbreviated: true })} ${f.location.zipCode()}`;
+    case "city-zip":
+      return `${f.location.streetAddress()}, ${f.location.city()} ${f.location.zipCode()}`;
+    default:
+      return `${f.location.streetAddress()}, ${f.location.zipCode()} ${f.location.city()}`;
   }
-  return `${f.location.streetAddress()}, ${f.location.city()}, ${f.location.state({ abbreviated: true })} ${f.location.zipCode()}`;
 };
 
 const street: Generate = (ctx) => fakerFor(ctx.seed, ctx.localeFor()).location.streetAddress();
@@ -282,12 +286,27 @@ const postcode: Generate = (ctx) => {
   }).join("");
 };
 
+// Legal company forms whose locale Leshy does not generate in yet: still worth
+// recognising, since the suffix is kept verbatim rather than generated.
+const EXTRA_SUFFIXES = ["Oy", "A/S", "ApS", "d.o.o."];
+
+// A suffix is written the way a human writes it; the pattern tolerates the
+// spacing and dropped dots that show up in real data ("Sp.z o.o", "Inc").
+const pattern = (suffix: string): string => suffix.replaceAll(".", "\\.?").replaceAll(" ", "\\s*");
+
+const SUFFIXES = [
+  ...new Set([...locales.flatMap((l) => LOCALES[l].orgSuffixes ?? []), ...EXTRA_SUFFIXES]),
+]
+  .sort((a, b) => b.length - a.length)
+  .map(pattern);
+
 // Legal suffixes kept verbatim; only the company name is faked (adr/0002).
-const ORG_SUFFIX =
-  /\s+(Sp\.\s*z\s*o\.\s*o\.|S\.A\.|Sp\.\s*j\.|Sp\.\s*k\.|GmbH|AG|Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|B\.V\.|Oy|AB|Pty\s+Ltd\.?)\s*$/i;
+const ORG_SUFFIX = new RegExp(`\\s+(${SUFFIXES.join("|")})\\s*$`, "i");
 // Faker often appends its own suffix; strip it so we don't double up.
-const FAKER_SUFFIX =
-  /[,\s]+(?:Sp\.?\s*z\s*o\.?\s*o\.?|z\s*o\.?\s*o\.?|S\.?A\.?|GmbH|AG|Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|Group|and\s+Sons)\s*$/i;
+const FAKER_SUFFIX = new RegExp(
+  `[,\\s]+(?:${[...SUFFIXES, "z\\s*o\\.?\\s*o\\.?", "Group", "and\\s+Sons"].join("|")})\\s*$`,
+  "i",
+);
 
 const org: Generate = (ctx) => {
   const f = fakerFor(ctx.seed, ctx.localeFor());

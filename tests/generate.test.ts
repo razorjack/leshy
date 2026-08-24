@@ -7,6 +7,7 @@ import { creditCard } from "../src/core/detect/detectors/creditCard.ts";
 import { iban } from "../src/core/detect/detectors/iban.ts";
 import { phone } from "../src/core/detect/detectors/phone.ts";
 import type { EntityType, LocaleSetting } from "../src/core/types.ts";
+import { locales } from "../src/core/generate/locales.ts";
 
 const config = resolveConfig();
 const SALT = "leshy-v1";
@@ -222,6 +223,35 @@ describe("semantic generators", () => {
     expect(pl).not.toContain("Acme");
     expect((await fakeOf("org", "Beispiel GmbH", "org")).endsWith("GmbH")).toBe(true);
     expect((await fakeOf("org", "Widgets Inc.", "org")).endsWith("Inc.")).toBe(true);
+  });
+
+  it("org keeps suffixes from any shipped locale, not just pl and en", async () => {
+    for (const [src, suffix] of [
+      ["Société Générale SA", "SA"],
+      ["Bouwbedrijf B.V.", "B.V."],
+      ["Fiat S.p.A.", "S.p.A."],
+      ["Telia AB", "AB"],
+      ["Seznam s.r.o.", "s.r.o."],
+      ["Padaria Ltda.", "Ltda."],
+    ] as const) {
+      const fake = await fakeOf("org", src, "org");
+      expect(fake.endsWith(` ${suffix}`)).toBe(true);
+      expect(fake).not.toBe(src);
+    }
+  });
+
+  it("address follows the locale's layout", async () => {
+    const src = "1 Main St, Springfield, IL 62704";
+    expect(await fakeIn("address", src, "address", "de")).toMatch(/, \d{5} \D+$/);
+    expect(await fakeIn("address", src, "address", "en")).toMatch(/, [A-Z]{2} \d{5}/);
+    expect(await fakeIn("address", src, "address", "en_GB")).not.toMatch(/, [A-Z]{2} \d/);
+  });
+
+  it("every shipped locale generates a full address", async () => {
+    for (const id of locales) {
+      const fake = await fakeIn("address", "1 Main St", "address", id);
+      expect(fake).toContain(",");
+    }
   });
 
   it("links a person to their email (same personSeed ⇒ shared first/last)", async () => {

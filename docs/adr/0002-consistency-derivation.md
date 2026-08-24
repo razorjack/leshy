@@ -113,6 +113,11 @@ n values in a paste; the alternative is a persistent registry, rejected below).
   `config.locale` or the settings dialog. The whole set is bundled, since locale data is
   data and lazy-loading it would make `fakerFor` async, which is why the table is a
   curated list rather than all ~70 faker locales.
+- **The locale owns its output formats.** Address layout (`street, 00-001 City` vs
+  `street, City, ST 12345`) and the legal company suffixes an org fake keeps verbatim are
+  fields on the locale entry, not branches in the generator. The suffix _matching_ set is
+  the union over every shipped locale, so `Société Générale SA` keeps its `SA` even in a
+  document generated in `en` — only the company name is faked.
 - **Locale is a config input, not only a per-value guess.** `config.locale` defaults to
   `'auto'`, which keeps the marker sniff described above; naming a locale (`locale: 'pl'`)
   applies it to every value in the document. Generators read it only through
