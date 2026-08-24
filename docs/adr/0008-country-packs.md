@@ -51,5 +51,8 @@ worth having. It is no longer the only one that gets that treatment.
 - `resolveConfig().countries` reports the selected ids, which the settings UI groups its
   detector toggles by instead of listing ~19 flat switches including "PESEL" for a user in
   São Paulo.
+- A pack's fake-namespace preserve rule travels with it, so `core/preserve.ts` holds only
+  country-neutral rules and idempotence is a pack-local property: deselect `pl` and both
+  the PESEL detector and the rule that recognises Leshy's own PESELs go at once.
 - Everything loading by default means the detector list grows with each pack, and with it
   the false-positive surface. That is the trade the recall-first invariant already makes.

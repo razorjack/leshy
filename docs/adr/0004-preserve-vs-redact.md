@@ -28,6 +28,8 @@ The ordering encodes the policy questions:
   shapes, so `{"trace_id": "1234 5678 9012"}` is preserved rather than scrubbed as a phone
   number, while a checksummed PESEL under an `id` key is still redacted.
 - **A fake from a previous run is never re-scrubbed** — PRESERVE_FAKE beats everything.
+  The `fake-*` rules for a country's own namespace ship with its pack (ADR-0008), so they
+  load and unload with the detector that produced the value.
 
 ### Semantic noise filters (before tiering; all rule-based, spike-validated)
 

@@ -1,5 +1,4 @@
 import type { PreserveRule } from "./types.ts";
-import { isFakePesel } from "./packs/pl/pesel.ts";
 
 const TIMESTAMP =
   /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|\s?[+-]\d{2}:?\d{2})?)?$/;
@@ -17,7 +16,8 @@ const DOC_IPV6 = /^2001:0*db8:/i;
 const FAKE_MAC = /^[0-9A-Fa-f][26AEae]([:-])(?:[0-9A-Fa-f]{2}\1){4}[0-9A-Fa-f]{2}$/;
 
 /**
- * Default preserve rules. `db-ids` and `timestamps` protect debugging value
+ * Country-neutral preserve rules; a country pack contributes its own
+ * (src/core/packs, adr/0008). `db-ids` and `timestamps` protect debugging value
  * (TIER.PRESERVE_RULE — a validated checksum still beats them). The `fake-*`
  * rules make scrubbing idempotent (TIER.PRESERVE_FAKE): Leshy's own fakes are
  * drawn from reserved namespaces no real value can occupy, so a second pass
@@ -53,17 +53,6 @@ export const defaultPreserve: PreserveRule[] = [
   {
     id: "fake-mac",
     isFake: (text) => FAKE_MAC.test(text),
-    enabled: true,
-  },
-  {
-    id: "fake-pesel",
-    isFake: (text) => /^\d{11}$/.test(text) && isFakePesel(text),
-    enabled: true,
-  },
-  {
-    id: "fake-ssn",
-    // Leshy generates SSN fakes with group "00", which is never issued.
-    isFake: (text) => /^\d{3}-00-\d{4}$/.test(text),
     enabled: true,
   },
 ];

@@ -97,6 +97,15 @@ describe("country packs", () => {
     expect(types("ssn 123-45-6789", us)).toContain("ssn");
   });
 
+  it("take their fake-namespace preserve rules with them", () => {
+    const ids = (c: Parameters<typeof resolveConfig>[0]): string[] =>
+      resolveConfig(c).preserve.map((r) => r.id);
+    expect(ids({})).toContain("fake-pesel");
+    expect(ids({ countries: ["us"] })).not.toContain("fake-pesel");
+    expect(ids({ countries: ["us"] })).toContain("fake-ssn");
+    expect(ids({ countries: [] })).toContain("fake-email");
+  });
+
   it("leave the country-neutral detectors alone", () => {
     const none = resolveConfig({ countries: [] }).detectors;
     expect(types("contact: jan@corp.com", none)).toContain("email");

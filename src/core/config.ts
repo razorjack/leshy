@@ -44,7 +44,11 @@ export const resolveConfig = (config: LeshyConfig = {}): ResolvedConfig => {
   return {
     countries: selected.map((p) => p.id),
     detectors,
-    preserve: [...defaultPreserve, ...(config.preserve ?? [])],
+    preserve: [
+      ...defaultPreserve,
+      ...selected.flatMap((p) => p.preserve ?? []),
+      ...(config.preserve ?? []),
+    ],
     salt: config.salt ?? DEFAULT_SALT,
     locale: config.locale ?? "auto",
     semantic: {

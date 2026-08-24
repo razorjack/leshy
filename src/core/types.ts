@@ -211,6 +211,12 @@ export interface CountryPack {
   /** The locale that pairs with this country, offered alongside it in the UI. */
   locale: Locale;
   detectors: Detector[];
+  /**
+   * Preserve rules the pack's own detectors need — in practice the membership
+   * test for the fake namespace its generators draw from. They load and unload
+   * with the pack, which is what keeps idempotence a pack-local property.
+   */
+  preserve?: PreserveRule[];
 }
 
 /** A named locale, or per-value detection. */
