@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 import { makeContext } from "../src/core/generate/context.ts";
 import { generators } from "../src/core/generate/generators.ts";
+import { pesel } from "../src/core/packs/pl/pesel.ts";
+import { ssn } from "../src/core/packs/us/ssn.ts";
 import { detect, scrub } from "../src/core/engine.ts";
 import { resolveConfig } from "../src/core/config.ts";
 import { creditCard } from "../src/core/detect/detectors/creditCard.ts";
@@ -12,19 +14,22 @@ import { locales } from "../src/core/generate/locales.ts";
 const config = resolveConfig();
 const SALT = "leshy-v1";
 
-type GenKey = keyof typeof generators;
+// A pack's own generator lives with its detector (adr/0008).
+const gen = { ...generators, pesel: pesel.generate, ssn: ssn.generate };
 
-const fakeOf = async (gen: GenKey, original: string, type: EntityType): Promise<string> => {
+type GenKey = keyof typeof gen;
+
+const fakeOf = async (key: GenKey, original: string, type: EntityType): Promise<string> => {
   const ctx = await makeContext(original, type, SALT);
-  return generators[gen](ctx);
+  return gen[key](ctx);
 };
 
 const fakeIn = async (
-  gen: GenKey,
+  key: GenKey,
   original: string,
   type: EntityType,
   locale: LocaleSetting,
-): Promise<string> => generators[gen](await makeContext(original, type, SALT, locale));
+): Promise<string> => gen[key](await makeContext(original, type, SALT, locale));
 
 const spanCount = async (text: string): Promise<number> => (await detect(text, { config })).length;
 

@@ -1,5 +1,6 @@
-import type { StructuralDetector } from "../../types.ts";
-import { generators } from "../../generate/generators.ts";
+import type { Generate, StructuralDetector } from "../../types.ts";
+import { fakerFor } from "../../generate/faker.ts";
+import { pad } from "../../generate/shape.ts";
 
 const CHECKSUM_WEIGHTS = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
 
@@ -28,6 +29,22 @@ const dateValid = (digits: string): boolean => {
   return day >= 1 && day <= 31;
 };
 
+const generate: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  const yy = pad(f.number.int({ min: 0, max: 99 }), 2);
+  // Month +40 → 2100s century band (41–52): checksum-valid, humanly impossible.
+  const mm = pad(f.number.int({ min: 1, max: 12 }) + 40, 2);
+  const dd = pad(f.number.int({ min: 1, max: 28 }), 2);
+  const s = `${f.number.int({ min: 0, max: 9 })}${f.number.int({ min: 0, max: 9 })}${f.number.int({ min: 0, max: 9 })}`;
+  let sex = f.number.int({ min: 0, max: 9 });
+  const srcSex = Number(ctx.normalized[9]);
+  // Keep the encoded sex (parity of the 10th digit); `^1` flips parity in 0–9.
+  if (Number.isFinite(srcSex) && sex % 2 !== srcSex % 2) sex ^= 1;
+  const ten = `${yy}${mm}${dd}${s}${sex}`;
+  const sum = CHECKSUM_WEIGHTS.reduce((acc, w, i) => acc + w * Number(ten[i]), 0);
+  return `${ten}${(10 - (sum % 10)) % 10}`;
+};
+
 export const pesel: StructuralDetector = {
   id: "pesel",
   label: "PESEL",
@@ -37,5 +54,5 @@ export const pesel: StructuralDetector = {
   match: /(?<!\d)\d{11}(?!\d)/g,
   keys: /^pesel$/i,
   validate: (text) => peselChecksum(text) && dateValid(text),
-  generate: generators.pesel,
+  generate,
 };

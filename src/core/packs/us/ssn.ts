@@ -1,5 +1,15 @@
-import type { StructuralDetector } from "../../types.ts";
-import { generators } from "../../generate/generators.ts";
+import type { Generate, StructuralDetector } from "../../types.ts";
+import { fakerFor } from "../../generate/faker.ts";
+import { pad } from "../../generate/shape.ts";
+
+const generate: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  let area = f.number.int({ min: 1, max: 899 });
+  if (area === 666) area = 665;
+  const serial = f.number.int({ min: 1, max: 9999 });
+  // Group "00" is never issued — Leshy's SSN fake namespace.
+  return `${pad(area, 3)}-00-${pad(serial, 4)}`;
+};
 
 export const ssn: StructuralDetector = {
   id: "ssn",
@@ -13,5 +23,5 @@ export const ssn: StructuralDetector = {
     const [area = "", group = "", serial = ""] = text.split("-");
     return area !== "000" && area !== "666" && group !== "00" && serial !== "0000";
   },
-  generate: generators.ssn,
+  generate,
 };

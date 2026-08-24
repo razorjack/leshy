@@ -2,6 +2,7 @@ import type { Generate } from "../types.ts";
 import { fakerFor } from "./faker.ts";
 import { LOCALES, type Locale, locales } from "./locales.ts";
 import { nameTokens } from "./derive.ts";
+import { digit } from "./shape.ts";
 
 /**
  * Per-type fake generators (docs/adr/0002 table). Each is a pure function of its
@@ -12,8 +13,6 @@ import { nameTokens } from "./derive.ts";
  * Output must never contain quotes, backslashes or newlines — the engine
  * reseeds on violation (adr/0002).
  */
-
-const pad = (n: number, width: number): string => String(n).padStart(width, "0");
 
 /** first/last name for a seed. Shared by person (step 5) and email linkage so
  * `Jan Kowalski` and `jan.kowalski@…` derive one identity (adr/0002). */
@@ -85,35 +84,6 @@ const mac: Generate = (ctx) => {
   );
   return [first, ...rest].join(sep);
 };
-
-const ssn: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  let area = f.number.int({ min: 1, max: 899 });
-  if (area === 666) area = 665;
-  const serial = f.number.int({ min: 1, max: 9999 });
-  // Group "00" is never issued — Leshy's SSN fake namespace.
-  return `${pad(area, 3)}-00-${pad(serial, 4)}`;
-};
-
-const PESEL_WEIGHTS = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
-
-const pesel: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  const yy = pad(f.number.int({ min: 0, max: 99 }), 2);
-  // Month +40 → 2100s century band (41–52): checksum-valid, humanly impossible.
-  const mm = pad(f.number.int({ min: 1, max: 12 }) + 40, 2);
-  const dd = pad(f.number.int({ min: 1, max: 28 }), 2);
-  const s = `${f.number.int({ min: 0, max: 9 })}${f.number.int({ min: 0, max: 9 })}${f.number.int({ min: 0, max: 9 })}`;
-  let sex = f.number.int({ min: 0, max: 9 });
-  const srcSex = Number(ctx.normalized[9]);
-  // Keep the encoded sex (parity of the 10th digit); `^1` flips parity in 0–9.
-  if (Number.isFinite(srcSex) && sex % 2 !== srcSex % 2) sex ^= 1;
-  const ten = `${yy}${mm}${dd}${s}${sex}`;
-  const sum = PESEL_WEIGHTS.reduce((acc, w, i) => acc + w * Number(ten[i]), 0);
-  return `${ten}${(10 - (sum % 10)) % 10}`;
-};
-
-const digit = (f: ReturnType<typeof fakerFor>): string => String(f.number.int({ min: 0, max: 9 }));
 
 // E.164 country codes are 1–3 digits. Separator-less numbers ("+14155552671")
 // give the layout no boundary to stop at, so cap the run: without the cap the
@@ -321,8 +291,6 @@ export const generators = {
   ipv4,
   ipv6,
   mac,
-  ssn,
-  pesel,
   phone,
   "credit-card": creditCard,
   iban,

@@ -117,8 +117,9 @@ detector — no model work. A field recognisable only by its name (`city`, `zip`
 
 A detector that only means something inside one country (a national id, a local address
 grammar) goes in `src/core/packs/<iso2>/` with a `CountryPack` manifest and one line in
-`packs/index.ts` — never in the always-on `detectors/` list (ADR-0008). All packs load
-unless `countries` says otherwise.
+`packs/index.ts` — never in the always-on `detectors/` list (ADR-0008). Its generator and
+its fake-namespace preserve rule live in the pack too. All packs load unless `countries`
+says otherwise.
 
 ## Code conventions
 
