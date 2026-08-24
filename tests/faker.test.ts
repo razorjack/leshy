@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { fakerFor, localeFor } from "../src/core/generate/faker.ts";
+import { locales } from "../src/core/generate/locales.ts";
 
 describe("fakerFor", () => {
   it("is deterministic: same seed ⇒ identical values", () => {
@@ -21,13 +22,18 @@ describe("localeFor", () => {
     expect(localeFor("Zażółć")).toBe("pl");
   });
 
-  it("picks pl for a Polish-address-shaped context", () => {
-    expect(localeFor("Kowalski", "ul. Piekna 12/4, 00-001 Warszawa")).toBe("pl");
-    expect(localeFor("Smith", "00-624")).toBe("pl");
+  it("picks pl for a Polish-address shape", () => {
+    expect(localeFor("ul. Piekna 12/4, 00-001 Warszawa")).toBe("pl");
+    expect(localeFor("00-624")).toBe("pl");
   });
 
   it("picks en otherwise", () => {
     expect(localeFor("John Smith")).toBe("en");
-    expect(localeFor("Bob", "just a plain sentence")).toBe("en");
+    expect(localeFor("just a plain sentence")).toBe("en");
+  });
+
+  it("reaches every shipped locale by name", () => {
+    for (const id of locales) expect(fakerFor(7, id).person.firstName()).toBeTruthy();
+    expect(locales.length).toBeGreaterThan(2);
   });
 });

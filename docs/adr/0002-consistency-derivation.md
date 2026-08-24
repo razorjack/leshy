@@ -104,6 +104,12 @@ n values in a paste; the alternative is a persistent registry, rejected below).
   head of every secret caught by key context (`secret`, `token`, `api_key`) — those have no
   vendor prefix by definition. Unrecognised keys are now replaced whole; `AKIA…`/`ghp_…`
   keep their prefix so the fake still reads as the kind of credential it replaced.
+- **The locale set is a table, not a union.** `generate/locales.ts` holds one entry per
+  locale Leshy ships — label, faker fallback chain, optional marker patterns — and `Locale`
+  is its key set, so adding a locale is a data line rather than a change to `fakerFor`.
+  Latin script only: `email` strips its local part to `[a-z0-9._+-]`, which would collapse
+  a Cyrillic or CJK name to `user@…`. Auto-detection scores marker hits per locale and
+  falls back to `en`, so a locale with no markers is reachable only by naming it.
 - **Person locale from the name tokens.** The `GenerateContext` exposes only the matched
   value, so locale still comes from the name itself rather than surrounding context: a
   diacritic-free Polish name (`Jan Kowalski`) gets an `en` fake. It is resolved from the

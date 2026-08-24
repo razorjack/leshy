@@ -1,5 +1,6 @@
 import type { Generate } from "../types.ts";
-import { fakerFor, localeFor, type Locale } from "./faker.ts";
+import { fakerFor, localeFor } from "./faker.ts";
+import type { Locale } from "./locales.ts";
 import { nameTokens } from "./derive.ts";
 
 /**
