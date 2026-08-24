@@ -27,6 +27,11 @@ describe("localeFor", () => {
     expect(localeFor("00-624")).toBe("pl");
   });
 
+  it("picks de for umlauts and German street names", () => {
+    expect(localeFor("Hans M\u00fcller")).toBe("de");
+    expect(localeFor("Hauptstra\u00dfe 12, 10115 Berlin")).toBe("de");
+  });
+
   it("picks en otherwise", () => {
     expect(localeFor("John Smith")).toBe("en");
     expect(localeFor("just a plain sentence")).toBe("en");

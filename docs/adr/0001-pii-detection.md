@@ -7,8 +7,10 @@ Status: accepted (validated by spike, 2026-07-05)
 Detection is a three-layer pipeline, resolved by precedence (ADR-0004):
 
 1. **Structural detectors** — regex + validator (checksums) for machine-checkable types:
-   email, phone, IPv4/6, MAC, credit card (Luhn), IBAN (mod-97), JWT, API-key shapes, UUID,
-   SSN, PESEL, and a Polish street-address pattern (`ul./al./os./pl. …`).
+   email, phone, IPv4/6, MAC, credit card (Luhn), IBAN (mod-97), JWT, API-key shapes, UUID.
+   National ids and local street-address grammars (PESEL, US SSN, German Steuer-ID,
+   `ul./al./os./pl. …`, `…straße 12, 10115 Berlin`) come from the selected country packs
+   (ADR-0008), on the same footing.
 2. **Key-context detectors** — a single format-agnostic key-value scanner over the raw text;
    values under PII-suggesting keys (`first_name`, `email`, `pesel`…) become spans without
    any model involvement.

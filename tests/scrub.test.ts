@@ -18,6 +18,8 @@ const golden: Record<string, string> = {
     "[ { name: 'Faith Casper', email: 'trevor@jagged-partridge.example', ssn: '812-00-0293' } ]",
   logfmt:
     '2024-01-02T10:00:00Z level=info user_email=elsa@torn-vibration.example user_id=98123 msg="login ok"',
+  "de-json":
+    '{"kunde":{"name":"Alessa Golomski","adresse":"Stüttekofener Str. 67a, 36781 Ost Jolina","steuer_id":"05197834327","email":"amya.corkery@nocturnal-digestive.example"}}',
 };
 
 /** Bytes outside replaced spans must equal the input, byte for byte (adr/0003). */
@@ -61,7 +63,7 @@ describe("scrub — idempotence (structured, namespace-fixed content)", () => {
 
   it("re-scrubbing structured types (email, ip, ssn, pesel, mac) changes nothing", async () => {
     const input =
-      'email=jan@corp.com ip=8.8.8.8 ssn=123-45-6789 pesel=44051401359 mac="00:1B:44:11:3A:B7"';
+      'email=jan@corp.com ip=8.8.8.8 ssn=123-45-6789 pesel=44051401359 steuer_id=86095742719 mac="00:1B:44:11:3A:B7"';
     const once = await scrub(input, { config });
     const twice = await scrub(once.output, { config });
     expect(twice.output).toBe(once.output);

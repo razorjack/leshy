@@ -49,6 +49,11 @@ worth having. It is no longer the only one that gets that treatment.
 
 - Adding a country is a directory and one line in `packs/index.ts`. It needs no change to
   the engine, the resolver or the config shape.
+- `de` was added as the first pack written after the split, and needed no change outside
+  its own directory: a Steuer-ID detector (ISO 7064 MOD 11,10 plus the repeated-digit
+  rule, which together pass 0.33% of random 11-digit runs), a street-address grammar, one
+  line in `packs/index.ts`, and German marker patterns in the locale table. That is the
+  whole cost of a country.
 - Moving the PESEL generator next to the PESEL detector also removed the copy of the
   checksum weights that the two files had been keeping in sync.
 - `resolveConfig().countries` reports the selected ids, which the settings dialog renders

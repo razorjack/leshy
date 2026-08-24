@@ -2,6 +2,8 @@ import { describe, expect, it } from "vite-plus/test";
 import { detectStructural } from "../src/core/detect/structural.ts";
 import { resolveConfig } from "../src/core/config.ts";
 import { peselChecksum, isFakePesel } from "../src/core/packs/pl/pesel.ts";
+import { isSteuerId, steuerId } from "../src/core/packs/de/steuerId.ts";
+import { makeContext } from "../src/core/generate/context.ts";
 
 const all = resolveConfig().detectors;
 
@@ -85,9 +87,40 @@ describe("fake namespaces (idempotence)", () => {
   });
 });
 
+describe("de pack", () => {
+  it("validates published Steuer-IDs and rejects near misses", () => {
+    for (const id of ["86095742719", "47036892816", "65929970489", "25768131411"]) {
+      expect(isSteuerId(id)).toBe(true);
+      expect(types(`steuer_id ${id}`)).toContain("steuer-id");
+    }
+    expect(isSteuerId("86095742718")).toBe(false); // wrong check digit
+    expect(isSteuerId("06095742719")).toBe(false); // never starts with 0
+    expect(isSteuerId("12345678995")).toBe(true); // one digit twice
+    expect(isSteuerId("13579246801")).toBe(false); // no digit repeats
+  });
+
+  it("generates a fake outside both the German and the Polish namespace", async () => {
+    for (const src of ["86095742719", "47036892816", "25768131411"]) {
+      const ctx = await makeContext(src, "steuer-id", "leshy-v1");
+      const fake = steuerId.generate(ctx);
+      expect(fake).toMatch(/^0\d{10}$/);
+      expect(isSteuerId(fake)).toBe(false);
+      expect(peselChecksum(fake) && Number(fake.slice(2, 4)) <= 12).toBe(false);
+      expect(types(`steuer_id ${fake}`)).not.toContain("steuer-id");
+    }
+  });
+
+  it("catches German street addresses without the model", () => {
+    expect(types("wohnt Hauptstraße 12, 10115 Berlin")).toContain("address");
+    expect(types("Lieferung an Musterweg 5a")).toContain("address");
+    expect(types("Karl-Marx-Allee 90, 10243 Berlin")).toContain("address");
+    expect(types("the herring 5 was fine")).not.toContain("address");
+  });
+});
+
 describe("country packs", () => {
   it("are all loaded by default", () => {
-    expect(resolveConfig().countries).toEqual(["pl", "us"]);
+    expect(resolveConfig().countries).toEqual(["de", "pl", "us"]);
   });
 
   it("take their detectors with them when deselected", () => {

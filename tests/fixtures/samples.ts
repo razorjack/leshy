@@ -65,6 +65,17 @@ export const samples: Sample[] = [
       { text: "2024-01-02T10:00:00Z", type: "timestamp", expect: "preserve" },
     ],
   },
+  {
+    name: "de-json",
+    input:
+      '{"kunde":{"name":"Hans M\u00fcller","adresse":"Hauptstra\u00dfe 12, 10115 Berlin","steuer_id":"86095742719","email":"hans.mueller@beispiel.de"}}',
+    gold: [
+      { text: "Hans M\u00fcller", type: "person", expect: "catch" },
+      { text: "Hauptstra\u00dfe 12, 10115 Berlin", type: "address", expect: "catch" },
+      { text: "86095742719", type: "steuer-id", expect: "catch" },
+      { text: "hans.mueller@beispiel.de", type: "email", expect: "catch" },
+    ],
+  },
 ];
 
 /** PII where key names give no hint — only the semantic model catches these

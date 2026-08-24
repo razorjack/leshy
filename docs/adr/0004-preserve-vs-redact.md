@@ -66,7 +66,7 @@ The ordering encodes the policy questions:
 
 - Adding a detector or preserve rule cannot reduce existing coverage (trim-not-drop, and
   corroboration keys off detector declarations, not hardcoded type lists).
-- The spike (`npm run spike`) locks all of this behaviour: 22/22 catches, 0 preserve
+- The spike (`npm run spike`) locks all of this behaviour: 26/26 catches, 0 preserve
   violations, both with and without key hints.
 
 ### Implementation notes (plan steps 3, 7 — deviations from the scaffold)

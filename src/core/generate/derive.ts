@@ -17,6 +17,7 @@ const DIGIT_TYPES: ReadonlySet<EntityType> = new Set([
   "phone",
   "pesel",
   "ssn",
+  "steuer-id",
   "credit-card",
   "iban",
 ]);

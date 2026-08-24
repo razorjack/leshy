@@ -56,7 +56,13 @@ const table = {
     orgSuffixes: ["Ltd.", "PLC", "LLP"],
   },
   cs_CZ: { label: "Czech", chain: [cs_CZ, en, base], orgSuffixes: ["s.r.o.", "a.s."] },
-  de: { label: "German", chain: [de, en, base], orgSuffixes: ["GmbH", "AG", "KG", "e.V."] },
+  de: {
+    label: "German",
+    chain: [de, en, base],
+    // Umlauts/eszett, a compound street name, or a legal form.
+    markers: [/[äöüßÄÖÜ]/g, /\p{Lu}[\p{L}-]*(?:stra(?:ß|ss)e|str\.)/gu, /\bGmbH\b/g],
+    orgSuffixes: ["GmbH", "AG", "KG", "e.V."],
+  },
   es: { label: "Spanish", chain: [es, en, base], orgSuffixes: ["S.A.", "S.L.", "S.L.U."] },
   fr: { label: "French", chain: [fr, en, base], orgSuffixes: ["SAS", "SARL", "SNC"] },
   it: { label: "Italian", chain: [it, en, base], orgSuffixes: ["S.p.A.", "S.r.l."] },

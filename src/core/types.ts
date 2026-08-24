@@ -27,6 +27,7 @@ export type EntityType =
   | "uuid"
   | "ssn"
   | "pesel"
+  | "steuer-id"
   | (string & {});
 
 export type DetectorId = string;
