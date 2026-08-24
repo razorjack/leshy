@@ -4,6 +4,10 @@
  * See docs/architecture.md and docs/adr/ for the reasoning behind each shape.
  */
 
+import type { Locale } from "./generate/locales.ts";
+
+export type { Locale };
+
 /** Built-in entity types. Custom detectors may introduce new string ids. */
 export type EntityType =
   | "person"
@@ -87,6 +91,13 @@ export interface GenerateContext {
    * name, so "jan.kowalski@…" and "Jan Kowalski" map to one fake person.
    */
   personSeed: (nameTokens: string[]) => number;
+  /**
+   * The locale to generate in. Under `locale: 'auto'` it is sniffed from `hint`
+   * (the matched value when omitted); under an explicit locale the hint is
+   * ignored. Generators that resolve a person pass the token sequence the
+   * person seed is keyed on, so a name and its linked email agree (adr/0002).
+   */
+  localeFor: (hint?: string) => Locale;
 }
 
 /**
@@ -185,6 +196,9 @@ export interface PreserveRule {
   enabled: boolean;
 }
 
+/** A named locale, or per-value detection. */
+export type LocaleSetting = Locale | "auto";
+
 export interface SemanticConfig {
   /** Model id under /models/. See docs/adr/0001-pii-detection.md. */
   model: string;
@@ -209,6 +223,11 @@ export interface LeshyConfig {
    * the box). Set your own to make your mapping private to you.
    */
   salt?: string;
+  /**
+   * Locale the fakes are generated in. 'auto' (the default) picks one per value
+   * from the marker patterns in generate/locales.ts.
+   */
+  locale?: LocaleSetting;
   semantic?: Partial<SemanticConfig>;
 }
 

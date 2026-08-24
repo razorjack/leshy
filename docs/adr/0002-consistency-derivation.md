@@ -110,9 +110,15 @@ n values in a paste; the alternative is a persistent registry, rejected below).
   Latin script only: `email` strips its local part to `[a-z0-9._+-]`, which would collapse
   a Cyrillic or CJK name to `user@…`. Auto-detection scores marker hits per locale and
   falls back to `en`, so a locale with no markers is reachable only by naming it.
+- **Locale is a config input, not only a per-value guess.** `config.locale` defaults to
+  `'auto'`, which keeps the marker sniff described above; naming a locale (`locale: 'pl'`)
+  applies it to every value in the document. Generators read it only through
+  `GenerateContext.localeFor(hint)`, which ignores the hint when the locale is explicit —
+  so the linkage below holds by construction in that case.
 - **Person locale from the name tokens.** The `GenerateContext` exposes only the matched
-  value, so locale still comes from the name itself rather than surrounding context: a
-  diacritic-free Polish name (`Jan Kowalski`) gets an `en` fake. It is resolved from the
+  value, so under `locale: 'auto'` the locale comes from the name itself rather than from
+  surrounding context: a diacritic-free Polish name (`Jan Kowalski`) gets an `en` fake
+  unless the document locale says otherwise. It is resolved from the
   same token sequence the person seed is, though. Reading it off the raw value instead
   handed one shared `personSeed` to two different faker locales, so `Łukasz Nowak` and
   `łukasz.nowak@…` — same seed — became two different people. Linkage, not Polishness, is

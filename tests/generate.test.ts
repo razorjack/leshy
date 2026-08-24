@@ -6,7 +6,7 @@ import { resolveConfig } from "../src/core/config.ts";
 import { creditCard } from "../src/core/detect/detectors/creditCard.ts";
 import { iban } from "../src/core/detect/detectors/iban.ts";
 import { phone } from "../src/core/detect/detectors/phone.ts";
-import type { EntityType } from "../src/core/types.ts";
+import type { EntityType, LocaleSetting } from "../src/core/types.ts";
 
 const config = resolveConfig();
 const SALT = "leshy-v1";
@@ -17,6 +17,13 @@ const fakeOf = async (gen: GenKey, original: string, type: EntityType): Promise<
   const ctx = await makeContext(original, type, SALT);
   return generators[gen](ctx);
 };
+
+const fakeIn = async (
+  gen: GenKey,
+  original: string,
+  type: EntityType,
+  locale: LocaleSetting,
+): Promise<string> => generators[gen](await makeContext(original, type, SALT, locale));
 
 const spanCount = async (text: string): Promise<number> => (await detect(text, { config })).length;
 
@@ -231,6 +238,35 @@ describe("semantic generators", () => {
     const emailLocal = (await fakeOf("email", "\u0142ukasz.nowak@x.com", "email")).split("@")[0]!;
     const [first, last] = person.toLowerCase().split(" ");
     expect(emailLocal).toBe(`${first}.${last}`);
+  });
+
+  it("an explicit locale overrides the per-value sniff", async () => {
+    expect(await fakeIn("person", "Jan Kowalski", "person", "de")).not.toBe(
+      await fakeOf("person", "Jan Kowalski", "person"),
+    );
+    // an en-looking source still yields the Polish `street, DD-DDD City` order
+    expect(await fakeIn("address", "1 Main St, Springfield, IL 62704", "address", "pl")).toMatch(
+      /, \d{2}-\d{3} /,
+    );
+  });
+
+  it("an explicit locale keeps a person linked to their email", async () => {
+    const person = await fakeIn("person", "Jan Kowalski", "person", "de");
+    const local = (await fakeIn("email", "jan.kowalski@corp.com", "email", "de")).split("@")[0];
+    expect(local).toBe(
+      person
+        .replace(" ", ".")
+        .toLowerCase()
+        .replace(/[^a-z0-9._+-]/g, ""),
+    );
+  });
+
+  it("config locale drives a whole scrub, deterministically", async () => {
+    const input = '{"full_name":"Jan Kowalski"}';
+    const pl = resolveConfig({ locale: "pl" });
+    const out = (await scrub(input, { config: pl })).output;
+    expect(out).not.toBe((await scrub(input, { config })).output);
+    expect((await scrub(input, { config: pl })).output).toBe(out);
   });
 
   it("is deterministic (fixed salt ⇒ exact strings)", async () => {

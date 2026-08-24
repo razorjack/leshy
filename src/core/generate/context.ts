@@ -1,5 +1,6 @@
-import type { EntityType, GenerateContext } from "../types.ts";
+import type { EntityType, GenerateContext, LocaleSetting } from "../types.ts";
 import { deriveSeed, normalise } from "./derive.ts";
+import { localeFor } from "./faker.ts";
 
 /**
  * Synchronous mixer for sub-scope seeds. The primary seed is SHA-256-derived
@@ -34,6 +35,7 @@ export const makeContext = async (
   original: string,
   type: EntityType,
   salt: string,
+  locale: LocaleSetting = "auto",
   retry = 0,
 ): Promise<GenerateContext> => {
   const normalized = normalise(original, type);
@@ -45,5 +47,6 @@ export const makeContext = async (
     seed,
     seedFor: (scope) => hash32(`${seed}:${scope}`),
     personSeed: (tokens) => hash32(`${salt}:person:${tokens.join(" ")}${tag}`),
+    localeFor: (hint) => (locale === "auto" ? localeFor(hint ?? original) : locale),
   };
 };

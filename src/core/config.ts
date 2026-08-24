@@ -1,4 +1,10 @@
-import type { Detector, LeshyConfig, PreserveRule, SemanticConfig } from "./types.ts";
+import type {
+  Detector,
+  LeshyConfig,
+  LocaleSetting,
+  PreserveRule,
+  SemanticConfig,
+} from "./types.ts";
 import { builtins } from "./detect/detectors/index.ts";
 import { defaultPreserve } from "./preserve.ts";
 import { DEFAULT_MODEL } from "./detect/semantic/models.ts";
@@ -15,6 +21,7 @@ export interface ResolvedConfig {
   detectors: Detector[];
   preserve: PreserveRule[];
   salt: string;
+  locale: LocaleSetting;
   semantic: SemanticConfig;
 }
 
@@ -30,6 +37,7 @@ export const resolveConfig = (config: LeshyConfig = {}): ResolvedConfig => {
     detectors,
     preserve: [...defaultPreserve, ...(config.preserve ?? [])],
     salt: config.salt ?? DEFAULT_SALT,
+    locale: config.locale ?? "auto",
     semantic: {
       model: DEFAULT_MODEL,
       threshold: DEFAULT_THRESHOLD,

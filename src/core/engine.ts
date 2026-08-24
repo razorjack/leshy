@@ -55,7 +55,7 @@ export const scrub = async (input: string, ctx: EngineContext): Promise<ScrubRes
     const detector = byId.get(span.detector);
     if (!detector) continue;
 
-    let gctx = await makeContext(span.text, span.type, salt);
+    let gctx = await makeContext(span.text, span.type, salt, ctx.config.locale);
     const normalized = gctx.normalized;
     let fake = detector.generate(gctx);
     const free = (f: string): boolean => {
@@ -65,7 +65,7 @@ export const scrub = async (input: string, ctx: EngineContext): Promise<ScrubRes
       return owner === undefined || owner === normalized;
     };
     for (let retry = 1; retry <= MAX_RETRIES && !free(fake); retry++) {
-      gctx = await makeContext(span.text, span.type, salt, retry);
+      gctx = await makeContext(span.text, span.type, salt, ctx.config.locale, retry);
       fake = detector.generate(gctx);
     }
     used.set(fake, normalized);

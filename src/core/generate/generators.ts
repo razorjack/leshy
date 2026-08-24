@@ -1,5 +1,5 @@
 import type { Generate } from "../types.ts";
-import { fakerFor, localeFor } from "./faker.ts";
+import { fakerFor } from "./faker.ts";
 import type { Locale } from "./locales.ts";
 import { nameTokens } from "./derive.ts";
 
@@ -26,21 +26,16 @@ export const personParts = (seed: number, locale: Locale): PersonParts => {
   return { first: f.person.firstName(), last: f.person.lastName() };
 };
 
-/**
- * Locale for a name, resolved from the same token sequence the person seed is.
- * A person and their linked email share a seed; resolving the locale from the
- * value instead would hand the same seed to two different faker locales and
- * produce two different people (adr/0002 linked identities).
- */
-const nameLocale = (tokens: string[]): Locale => localeFor(tokens.join(" "));
-
 const email: Generate = (ctx) => {
   const at = ctx.original.lastIndexOf("@");
   const localRaw = at > 0 ? ctx.original.slice(0, at) : ctx.original;
   const tokens = nameTokens(localRaw);
   let local: string;
   if (tokens) {
-    const { first, last } = personParts(ctx.personSeed(tokens), nameLocale(tokens));
+    // Locale from the same token sequence the person seed is: a value-derived
+    // locale would hand one shared seed to two faker locales and split the
+    // person from their email into two people (adr/0002 linked identities).
+    const { first, last } = personParts(ctx.personSeed(tokens), ctx.localeFor(tokens.join(" ")));
     local = tokens.length > 1 ? `${first}.${last}` : first;
   } else {
     local = fakerFor(ctx.seed, "en").internet.username();
@@ -247,7 +242,7 @@ const matchCase = (fake: string, src: string): string => {
 
 const person: Generate = (ctx) => {
   const tokens = nameTokens(ctx.original) ?? [ctx.normalized];
-  const locale = nameLocale(tokens);
+  const locale = ctx.localeFor(tokens.join(" ")); // see email: linkage, not value
   const { first, last } = personParts(ctx.personSeed(tokens), locale); // links to email
   const words = ctx.original.split(/\s+/).filter(Boolean);
   let names: string[];
@@ -263,17 +258,17 @@ const person: Generate = (ctx) => {
 };
 
 const address: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, localeFor(ctx.original));
-  if (localeFor(ctx.original) === "pl") {
+  const locale = ctx.localeFor();
+  const f = fakerFor(ctx.seed, locale);
+  if (locale === "pl") {
     return `${f.location.streetAddress()}, ${f.location.zipCode()} ${f.location.city()}`;
   }
   return `${f.location.streetAddress()}, ${f.location.city()}, ${f.location.state({ abbreviated: true })} ${f.location.zipCode()}`;
 };
 
-const street: Generate = (ctx) =>
-  fakerFor(ctx.seed, localeFor(ctx.original)).location.streetAddress();
+const street: Generate = (ctx) => fakerFor(ctx.seed, ctx.localeFor()).location.streetAddress();
 
-const city: Generate = (ctx) => fakerFor(ctx.seed, localeFor(ctx.original)).location.city();
+const city: Generate = (ctx) => fakerFor(ctx.seed, ctx.localeFor()).location.city();
 
 // A postal code is a formatted code, not prose. Swapping digit for digit and
 // letter for letter keeps every country's shape (00-624, SW1A 1AA, 97477-1234)
@@ -295,7 +290,7 @@ const FAKER_SUFFIX =
   /[,\s]+(?:Sp\.?\s*z\s*o\.?\s*o\.?|z\s*o\.?\s*o\.?|S\.?A\.?|GmbH|AG|Inc\.?|LLC|Ltd\.?|Corp\.?|Co\.?|Group|and\s+Sons)\s*$/i;
 
 const org: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, localeFor(ctx.original));
+  const f = fakerFor(ctx.seed, ctx.localeFor());
   const m = ctx.original.match(ORG_SUFFIX);
   const suffix = m ? m[1] : "";
   const base = f.company.name().replace(FAKER_SUFFIX, "").trim() || f.person.lastName();
