@@ -3,28 +3,39 @@
   import { SlidersHorizontal } from '@lucide/svelte'
   import { session } from '../../state/session.svelte.ts'
   import { resolveConfig } from '../../core/config.ts'
+  import { packs } from '../../core/packs/index.ts'
+  import { LOCALES, locales } from '../../core/generate/locales.ts'
+  import type { LocaleSetting } from '../../core/types.ts'
   import * as Dialog from './ui/dialog/index.ts'
   import { Switch } from './ui/switch/index.ts'
 
   const SALT_KEY = 'leshy-salt'
   const OVERRIDES_KEY = 'leshy-overrides'
 
-  const detectors = resolveConfig().detectors
+  const base = resolveConfig()
   const defaults: Record<string, boolean> = Object.fromEntries(
-    detectors.map((d) => [d.id, d.enabled]),
+    base.detectors.map((d) => [d.id, d.enabled]),
   )
 
   let enabled = $state<Record<string, boolean>>({ ...defaults })
+  let countries = $state<string[]>([...base.countries])
+  let locale = $state<LocaleSetting>(base.locale)
   let semantic = $state(true)
   let salt = $state('')
+
+  // Deselecting a country takes its detectors out of the config, so the list
+  // below shows exactly what is running rather than every rule Leshy ships.
+  const detectors = $derived(resolveConfig({ countries }).detectors)
 
   // Derive the serialisable overrides from the toggle state relative to the
   // built-in defaults, push them to the session (re-scrubs) and persist them.
   const apply = (): void => {
-    const disable = detectors.filter((d) => defaults[d.id] && !enabled[d.id]).map((d) => d.id)
-    const enable = detectors.filter((d) => !defaults[d.id] && enabled[d.id]).map((d) => d.id)
-    session.setOverrides({ disable, enable, semanticEnabled: semantic, ...(salt ? { salt } : {}) })
-    localStorage.setItem(OVERRIDES_KEY, JSON.stringify({ disable, enable, semanticEnabled: semantic }))
+    const all = base.detectors
+    const disable = all.filter((d) => defaults[d.id] && !enabled[d.id]).map((d) => d.id)
+    const enable = all.filter((d) => !defaults[d.id] && enabled[d.id]).map((d) => d.id)
+    const saved = { disable, enable, countries, locale, semanticEnabled: semantic }
+    session.setOverrides({ ...saved, ...(salt ? { salt } : {}) })
+    localStorage.setItem(OVERRIDES_KEY, JSON.stringify(saved))
     if (salt) localStorage.setItem(SALT_KEY, salt)
     else localStorage.removeItem(SALT_KEY)
   }
@@ -35,9 +46,15 @@
       const saved = JSON.parse(localStorage.getItem(OVERRIDES_KEY) ?? '{}') as {
         disable?: string[]
         enable?: string[]
+        countries?: string[]
+        locale?: LocaleSetting
         semanticEnabled?: boolean
       }
       if (saved.semanticEnabled === false) semantic = false
+      if (saved.countries) countries = saved.countries.filter((id) => packs.some((p) => p.id === id))
+      if (saved.locale && (saved.locale === 'auto' || locales.includes(saved.locale))) {
+        locale = saved.locale
+      }
       for (const id of saved.disable ?? []) enabled[id] = false
       for (const id of saved.enable ?? []) enabled[id] = true
     } catch {
@@ -56,6 +73,11 @@
 
   const setDetector = (id: string, value: boolean): void => {
     enabled[id] = value
+    apply()
+  }
+
+  const setCountry = (id: string, value: boolean): void => {
+    countries = value ? [...countries, id] : countries.filter((c) => c !== id)
     apply()
   }
 </script>
@@ -88,9 +110,48 @@
         <span class="text-xs text-muted-foreground">Changes every fake deterministically.</span>
       </label>
 
+      <label class="flex flex-col gap-1">
+        <span class="text-sm font-medium">Locale</span>
+        <select
+          value={locale}
+          class="rounded-md border border-input bg-transparent px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          onchange={(e) => { locale = e.currentTarget.value as LocaleSetting; apply() }}
+        >
+          <option value="auto">Automatic (from the text)</option>
+          {#each locales as id (id)}
+            <option value={id}>{LOCALES[id].label}</option>
+          {/each}
+        </select>
+        <span class="text-xs text-muted-foreground">Which language the fakes are written in.</span>
+      </label>
+
       <div class="flex items-center justify-between gap-4">
         <span class="text-sm font-medium">Semantic model (names, addresses, orgs)</span>
         <Switch checked={semantic} onCheckedChange={(v) => { semantic = v; apply() }} />
+      </div>
+
+      <div class="space-y-2">
+        <span class="text-sm font-medium">Countries</span>
+        <p class="text-xs text-muted-foreground">
+          National ids and local address formats. Off means those rules do not run.
+        </p>
+        <ul class="divide-y divide-border rounded-md border border-border">
+          {#each packs as p (p.id)}
+            <li class="flex items-center justify-between gap-4 px-3 py-2">
+              <span class="flex flex-col">
+                <span class="text-sm">{p.label}</span>
+                <span class="font-mono text-xs text-muted-foreground">
+                  {p.detectors.map((d) => d.id).join(' · ')}
+                </span>
+              </span>
+              <Switch
+                checked={countries.includes(p.id)}
+                onCheckedChange={(v) => setCountry(p.id, v)}
+                aria-label={p.label}
+              />
+            </li>
+          {/each}
+        </ul>
       </div>
 
       <div class="space-y-2">

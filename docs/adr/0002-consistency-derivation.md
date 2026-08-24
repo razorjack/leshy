@@ -109,7 +109,10 @@ n values in a paste; the alternative is a persistent registry, rejected below).
   is its key set, so adding a locale is a data line rather than a change to `fakerFor`.
   Latin script only: `email` strips its local part to `[a-z0-9._+-]`, which would collapse
   a Cyrillic or CJK name to `user@…`. Auto-detection scores marker hits per locale and
-  falls back to `en`, so a locale with no markers is reachable only by naming it.
+  falls back to `en`, so a locale with no markers is reachable only by naming it — from
+  `config.locale` or the settings dialog. The whole set is bundled, since locale data is
+  data and lazy-loading it would make `fakerFor` async, which is why the table is a
+  curated list rather than all ~70 faker locales.
 - **Locale is a config input, not only a per-value guess.** `config.locale` defaults to
   `'auto'`, which keeps the marker sniff described above; naming a locale (`locale: 'pl'`)
   applies it to every value in the document. Generators read it only through

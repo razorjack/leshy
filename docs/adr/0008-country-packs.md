@@ -48,9 +48,10 @@ worth having. It is no longer the only one that gets that treatment.
 
 - Adding a country is a directory and one line in `packs/index.ts`. It needs no change to
   the engine, the resolver or the config shape.
-- `resolveConfig().countries` reports the selected ids, which the settings UI groups its
-  detector toggles by instead of listing ~19 flat switches including "PESEL" for a user in
-  São Paulo.
+- `resolveConfig().countries` reports the selected ids, which the settings dialog renders
+  as one switch per country. Deselecting one removes its detectors from the list below it,
+  so the Detectors section shows what is actually running instead of every rule Leshy
+  ships — no "PESEL" switch for a user in São Paulo.
 - A pack's fake-namespace preserve rule travels with it, so `core/preserve.ts` holds only
   country-neutral rules and idempotence is a pack-local property: deselect `pl` and both
   the PESEL detector and the rule that recognises Leshy's own PESELs go at once.

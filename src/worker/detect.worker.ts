@@ -68,6 +68,8 @@ const configFor = (o: ScrubOverrides | undefined): ResolvedConfig => {
     ...userConfig,
     disable: [...(userConfig.disable ?? []), ...(o?.disable ?? [])],
     enable: [...(userConfig.enable ?? []), ...(o?.enable ?? [])],
+    countries: o?.countries ?? userConfig.countries,
+    locale: o?.locale ?? userConfig.locale,
     salt: o?.salt ?? userConfig.salt,
     semantic: {
       ...userConfig.semantic,

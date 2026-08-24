@@ -19,6 +19,19 @@ describe("config overrides", () => {
     expect(salted1.output).toBe(salted2.output); // deterministic per salt
   });
 
+  it("deselecting a country takes its rules out", async () => {
+    const doc = '{"pesel":"44051401359"}';
+    expect((await scrub(doc, { config: resolveConfig() })).output).not.toBe(doc);
+    expect((await scrub(doc, { config: resolveConfig({ countries: ["us"] }) })).output).toBe(doc);
+  });
+
+  it("a locale changes the fakes without changing what is detected", async () => {
+    const base = await scrub(input, { config: resolveConfig() });
+    const de = await scrub(input, { config: resolveConfig({ locale: "de" }) });
+    expect(de.output).not.toBe(base.output);
+    expect(de.replacements.length).toBe(base.replacements.length);
+  });
+
   it("enabling an off-by-default detector activates it (uuid)", async () => {
     const withUuid = await scrub("id 123e4567-e89b-42d3-a456-426614174000", {
       config: resolveConfig({ enable: ["uuid"] }),
