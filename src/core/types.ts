@@ -182,7 +182,11 @@ export interface PreserveRule {
   id: string;
   /** Preserve values sitting under keys matching this pattern (`id`, `_id`…). */
   keys?: RegExp;
-  /** Preserve raw-text shapes (timestamps, version strings…). */
+  /**
+   * Preserve values of this shape (timestamps, version strings…). With `keys`
+   * it narrows the rule to values under those keys; alone it spares every
+   * detected span whose whole text matches.
+   */
   match?: RegExp;
   /**
    * Membership test for Leshy's own fake namespaces (TEST-NET IPs, .example

@@ -141,6 +141,8 @@ export const resolve = (
     }
   }
   const preserveRegions = sortMerged(preserved);
+  const shapeRules = activePreserve.filter((r) => !r.keys && r.match);
+  const preservedShape = (s: Span): boolean => shapeRules.some((r) => r.match?.test(s.text));
 
   // Corroboration applies to types the model does NOT own: when no semantic
   // detector claims a type (email, phone, ip…), a lone model guess of that
@@ -182,7 +184,9 @@ export const resolve = (
   spans = spans.filter((s) => !hits(fakeRegions, s));
 
   // preserve rules beat everything below TIER.VALIDATED
-  spans = spans.filter((s) => spanTier(s) >= TIER.VALIDATED || !hits(preserveRegions, s));
+  spans = spans.filter(
+    (s) => spanTier(s) >= TIER.VALIDATED || !(hits(preserveRegions, s) || preservedShape(s)),
+  );
 
   const order = new Map(detectors.map((d, i) => [d.id, i]));
   const rank = (s: Span): number => order.get(s.detector) ?? detectors.length;

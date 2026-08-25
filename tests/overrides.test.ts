@@ -32,6 +32,16 @@ describe("config overrides", () => {
     expect(de.replacements.length).toBe(base.replacements.length);
   });
 
+  it("a match-only preserve rule spares spans of that shape", async () => {
+    const doc = "build 10.2.3.4 host 10.2.3.5";
+    const config = resolveConfig({
+      preserve: [{ id: "versions", match: /^10\.2\.3\.4$/, enabled: true }],
+    });
+    const r = await scrub(doc, { config });
+    expect(r.output).toContain("10.2.3.4");
+    expect(r.output).not.toContain("10.2.3.5");
+  });
+
   it("enabling an off-by-default detector activates it (uuid)", async () => {
     const withUuid = await scrub("id 123e4567-e89b-42d3-a456-426614174000", {
       config: resolveConfig({ enable: ["uuid"] }),
