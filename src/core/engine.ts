@@ -1,7 +1,6 @@
 import type { Detector, Replacement, ScrubResult, Span } from "./types.ts";
 import type { ResolvedConfig } from "./config.ts";
-import { scanKeyValues } from "./detect/keyContext.ts";
-import { detectByKey } from "./detect/keyContext.ts";
+import { detectByKey, scanKeyValues } from "./detect/keyContext.ts";
 import { detectStructural } from "./detect/structural.ts";
 import { resolve } from "./detect/resolve.ts";
 import { makeContext } from "./generate/context.ts";
