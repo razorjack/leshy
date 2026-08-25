@@ -228,7 +228,7 @@ export interface SemanticConfig {
   model: string;
   /** Recall/precision dial. Validated default: 0.35. */
   threshold: number;
-  /** Zero-shot label set sent to the model in one pass. */
+  /** Run the model at all; off means rule-based detection only. */
   enabled: boolean;
 }
 
