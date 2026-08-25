@@ -26,6 +26,8 @@ class Session {
   error = $state<string | undefined>(undefined);
   /** The last result was produced without the model (it failed to load). */
   warning = $state<string | undefined>(undefined);
+  /** Values the user clicked to leave verbatim. Session-only, never stored. */
+  kept = $state<string[]>([]);
 
   private overrides: ScrubOverrides = {};
   private worker: ScrubWorker | undefined;
@@ -78,13 +80,25 @@ class Session {
     if (this.input.trim() !== "") void this.run(this.input);
   }
 
+  keep(value: string): void {
+    if (this.kept.includes(value)) return;
+    this.kept = [...this.kept, value];
+    void this.run(this.input);
+  }
+
+  restore(value: string): void {
+    this.kept = this.kept.filter((v) => v !== value);
+    if (this.input.trim() !== "") void this.run(this.input);
+  }
+
   private async run(value: string): Promise<void> {
     const worker = this.ensureWorker();
     const token = ++this.token;
     this.error = undefined;
     this.stage = "working";
     try {
-      const result = await worker.scrub(value, this.overrides);
+      const overrides = { ...this.overrides, keep: $state.snapshot(this.kept) };
+      const result = await worker.scrub(value, overrides);
       if (token !== this.token) return; // superseded by a newer request
       this.output = result.output;
       this.replacements = result.replacements;

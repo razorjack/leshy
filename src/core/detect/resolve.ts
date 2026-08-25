@@ -179,6 +179,18 @@ const dropFakes = (spans: Span[], rules: PreserveRule[]): Span[] => {
   return spans.filter((s) => !hits(fakeRegions, s));
 };
 
+/**
+ * Values the user pointed at and said "keep" outrank every tier, checksum
+ * included: the decision was made looking at this very output. The whole
+ * region goes, so no fragment of a kept value is scrubbed by another detector.
+ */
+const applyKeep = (spans: Span[], keep: string[]): Span[] => {
+  if (keep.length === 0) return spans;
+  const kept = new Set(keep);
+  const regions = sortMerged(spans.filter((s) => kept.has(s.text)));
+  return spans.filter((s) => !hits(regions, s));
+};
+
 /** Preserve rules beat everything below TIER.VALIDATED. */
 const applyPreserve = (spans: Span[], rules: PreserveRule[], kvs: KeyValue[]): Span[] => {
   const regions = preservedRanges(rules, kvs);
@@ -225,6 +237,7 @@ export const resolve = (
   detectors: Detector[],
   preserve: PreserveRule[],
   kvs?: KeyValue[],
+  keep: string[] = [],
 ): Span[] => {
   const keyValues = kvs ?? scanKeyValues(input);
   const rules = preserve.filter((r) => r.enabled);
@@ -235,5 +248,6 @@ export const resolve = (
   let spans = mergeAdjacent([...structural, ...bySource("key-context"), ...semantic], input);
   spans = dropFakes(spans, rules);
   spans = applyPreserve(spans, rules, keyValues);
+  spans = applyKeep(spans, keep);
   return settleOverlaps(spans, detectors, input);
 };

@@ -26,6 +26,8 @@ export interface ResolvedConfig {
   salt: string;
   locale: LocaleSetting;
   semantic: SemanticConfig;
+  /** Values the user chose to leave verbatim, whatever detected them. */
+  keep: string[];
 }
 
 /**
@@ -41,6 +43,8 @@ export interface ConfigOverrides {
   locale?: LocaleSetting;
   salt?: string;
   semanticEnabled?: boolean;
+  /** Exact values to leave verbatim: a click on a mark says "not this one". */
+  keep?: string[];
 }
 
 // A toggle in the UI is the later decision, so it wins over the config's lists.
@@ -87,6 +91,7 @@ export const resolveConfig = (
     ],
     salt: config.salt ?? DEFAULT_SALT,
     locale: config.locale ?? "auto",
+    keep: overrides?.keep ?? [],
     semantic: {
       model: DEFAULT_MODEL,
       threshold: DEFAULT_THRESHOLD,

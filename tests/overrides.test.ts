@@ -47,6 +47,14 @@ describe("config overrides", () => {
     expect(r.output).not.toContain("10.2.3.5");
   });
 
+  it("a kept value stays verbatim even when a checksum proved it", async () => {
+    const doc = '{"pesel":"44051401359","email":"jan.kowalski@gmail.com"}';
+    const config = resolveConfig({}, { keep: ["44051401359"] });
+    const r = await scrub(doc, { config });
+    expect(r.output).toContain("44051401359");
+    expect(r.output).not.toContain("jan.kowalski@gmail.com");
+  });
+
   it("enabling an off-by-default detector activates it (uuid)", async () => {
     const withUuid = await scrub("id 123e4567-e89b-42d3-a456-426614174000", {
       config: resolveConfig({ enable: ["uuid"] }),

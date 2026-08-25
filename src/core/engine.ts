@@ -24,7 +24,7 @@ export const detect = async (input: string, ctx: EngineContext): Promise<Span[]>
     ...detectByKey(input, detectors, kvs),
     ...(ctx.semantic ? await ctx.semantic(input) : []),
   ];
-  return resolve(raw, input, detectors, ctx.config.preserve, kvs);
+  return resolve(raw, input, detectors, ctx.config.preserve, kvs, ctx.config.keep);
 };
 
 // Generator output may never contain these — they would corrupt the surrounding

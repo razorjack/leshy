@@ -1,5 +1,6 @@
 <script lang="ts">
   import { session } from '../../state/session.svelte.ts'
+  import type { Replacement } from '../../core/types.ts'
   import { splitOutput } from '../segments.ts'
   import TokenMark from './TokenMark.svelte'
   import { Button } from './ui/button/index.ts'
@@ -8,6 +9,8 @@
   // A fake becomes a <TokenMark>; everything else is verbatim text (see splitOutput).
   const segments = $derived(splitOutput(session.output, session.replacements))
   const hasOutput = $derived(session.output.length > 0)
+  const original = (rep: Replacement): string =>
+    session.scrubbedFrom.slice(rep.sourceStart, rep.sourceEnd)
 
   // A tally by entity type. On a long paste the marks scroll out of sight, so
   // this is the only place that says how much was replaced, and the quickest
@@ -60,6 +63,24 @@
       </Button>
     {/if}
   </div>
+  {#if session.kept.length > 0}
+    <ul class="flex flex-wrap items-center gap-1.5 px-6 pt-3 text-xs text-muted-foreground">
+      <li>Kept:</li>
+      {#each session.kept as value (value)}
+        <li>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 font-mono hover:text-foreground"
+            title="Scrub it again"
+            onclick={() => session.restore(value)}
+          >
+            <span class="max-w-48 truncate">{value}</span>
+            <span aria-hidden="true">×</span>
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
   <div class="flex-1 overflow-auto p-6 font-mono text-sm">
     {#if hasOutput}
       <Tooltip.Provider delayDuration={200}>
@@ -68,6 +89,8 @@
           >{#each segments as seg}{#if seg.kind === 'text'}{seg.text}{:else}<TokenMark
                 fake={seg.rep.fake}
                 label={seg.rep.label}
+                original={original(seg.rep)}
+                onkeep={() => session.keep(original(seg.rep))}
               />{/if}{/each}</div>
       </Tooltip.Provider>
     {:else if session.error}
