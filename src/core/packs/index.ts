@@ -8,5 +8,3 @@ import { us } from "./us/index.ts";
  * list, where it is the tie-break for equal-tier overlaps (adr/0004).
  */
 export const packs: CountryPack[] = [de, pl, us];
-
-export const packFor = (id: string): CountryPack | undefined => packs.find((p) => p.id === id);
