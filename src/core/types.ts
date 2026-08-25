@@ -21,6 +21,7 @@ export type EntityType =
   | "phone"
   | "ip"
   | "mac"
+  | "hostname"
   | "credit-card"
   | "iban"
   | "jwt"

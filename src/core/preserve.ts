@@ -7,13 +7,14 @@ export const TIMESTAMP =
 // Loopback and unspecified IPv4 name the machine itself, not a peer. The IPv6
 // forms are validated matches, which outrank preserve rules, so the ipv6
 // validator rejects those itself.
-const LOOPBACK = /^(?:127\.\d{1,3}\.\d{1,3}\.\d{1,3}|0\.0\.0\.0)$/;
+const LOOPBACK = /^(?:127\.\d{1,3}\.\d{1,3}\.\d{1,3}|0\.0\.0\.0|localhost(?::\d+)?)$/;
 
 // RFC 5737 TEST-NET ranges — Leshy's fake namespace for public IPv4s.
 const TEST_NET = /^(?:192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}$/;
 
 // RFC 2606 reserved TLD — Leshy's fake namespace for emails and hostnames.
 const EXAMPLE_TLD = /\.example$/i;
+const EXAMPLE_HOST = /^[a-z0-9.-]+\.example(?::\d+)?$/i;
 
 // RFC 3849 documentation prefix — Leshy's fake namespace for IPv6.
 const DOC_IPV6 = /^2001:0*db8:/i;
@@ -51,6 +52,11 @@ export const defaultPreserve: PreserveRule[] = [
   {
     id: "fake-email",
     isFake: (text) => text.includes("@") && EXAMPLE_TLD.test(text),
+    enabled: true,
+  },
+  {
+    id: "fake-hostname",
+    isFake: (text) => EXAMPLE_HOST.test(text),
     enabled: true,
   },
   {

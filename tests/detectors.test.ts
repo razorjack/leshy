@@ -52,6 +52,17 @@ describe("structural detectors", () => {
     expect(types("commit 2fd4e1c67a2d28fced849ee1bb76e7391b93eb12")).not.toContain("secret");
   });
 
+  it("fakes hostnames under host keys, keeps the port and localhost", async () => {
+    const doc = "db_host=pg-1.prod.corp.internal:5432 redis_host=localhost:6379 host=10.0.0.5";
+    const r = await scrub(doc, { config: resolveConfig() });
+    expect(r.output).toMatch(
+      /^db_host=[a-z0-9-]+\.[a-z0-9-]+\.[a-z0-9-]+\.example:5432 redis_host=localhost:6379 host=10\.\d+\.\d+\.\d+$/,
+    );
+    // the fake hostname is in the reserved namespace, so a second pass keeps it
+    const again = await scrub(r.output, { config: resolveConfig() });
+    expect(again.output.split(" host=")[0]).toBe(r.output.split(" host=")[0]);
+  });
+
   it("matches emails", () => {
     expect(types("contact: jan.kowalski+dev@sub.gmail.com")).toContain("email");
   });

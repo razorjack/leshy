@@ -271,6 +271,16 @@ const cardExpiry: Generate = (ctx) => {
   });
 };
 
+// One fake label per source label under the reserved `.example` TLD, so the
+// depth survives and a re-scrub recognises the result. A port stays.
+const hostname: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  const [host = "", ...rest] = ctx.original.split(":");
+  const labels = host.split(".").filter(Boolean);
+  const fake = labels.slice(0, Math.max(labels.length - 1, 1)).map(() => f.internet.domainWord());
+  return [`${fake.join(".")}.example`, ...rest].join(":");
+};
+
 const uuid: Generate = (ctx) => fakerFor(ctx.seed, "en").string.uuid();
 
 /** Reproduce the source word's casing on a faked word. */
@@ -389,6 +399,7 @@ export const generators = {
   "api-key": apiKey,
   secret,
   uuid,
+  hostname,
   dob,
   geo,
   "card-code": cardCode,

@@ -19,6 +19,7 @@ import {
   webhook,
 } from "./secret.ts";
 import { uuid } from "./uuid.ts";
+import { hostname } from "./hostname.ts";
 import { person } from "./person.ts";
 import { username } from "./username.ts";
 import { address, city, postcode, street } from "./address.ts";
@@ -54,6 +55,7 @@ export const builtins: Detector[] = [
   ipv4,
   phone,
   uuid,
+  hostname,
   username,
   person,
   street,

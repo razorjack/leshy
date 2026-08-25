@@ -81,6 +81,8 @@ describe("key routing", () => {
     ["password", "password"],
     ["pesel", "pesel"],
     ["ssn", "ssn"],
+    ["host", "hostname"],
+    ["db_host", "hostname"],
     ["dob", "birth-date"],
     ["birth_date", "birth-date"],
     ["lat", "coordinates"],
