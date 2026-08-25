@@ -39,6 +39,18 @@ export const password: KeyDetector = {
   generate: generators.secret,
 };
 
+// Anything under a `*_secret` or `*_token` key. No prefix survives on the fake
+// (there is none to keep), so the shape-only secret generator is the right one.
+export const token: KeyDetector = {
+  id: "token",
+  label: "Secret / token",
+  type: "secret",
+  kind: "key",
+  enabled: true,
+  keys: /secret|token$/i,
+  generate: generators.secret,
+};
+
 export const sessionId: KeyDetector = {
   id: "session-id",
   label: "Session / CSRF token",

@@ -53,6 +53,41 @@ describe("same-type overlap", () => {
 });
 
 describe("key routing", () => {
+  // Declaration order in detectors/index.ts is the routing rule for keys that
+  // several patterns match; this table is what that order is meant to produce.
+  const routes: Array<[key: string, detector: string]> = [
+    ["email", "email"],
+    ["user_email", "email"],
+    ["email_address", "email"],
+    ["ip_address", "ipv4"],
+    ["mac_address", "mac"],
+    ["shipping_address", "address"],
+    ["address_line1", "street"],
+    ["city", "city"],
+    ["zip", "postcode"],
+    ["full_name", "person"],
+    ["username", "person"],
+    ["company", "org"],
+    ["phone", "phone"],
+    ["card_number", "credit-card"],
+    ["iban", "iban"],
+    ["api_key", "api-key"],
+    ["x-api-key", "api-key"],
+    ["client_secret", "token"],
+    ["access_token", "token"],
+    ["csrf_token", "session-id"],
+    ["session_id", "session-id"],
+    ["password", "password"],
+    ["pesel", "pesel"],
+    ["ssn", "ssn"],
+  ];
+  for (const [key, detector] of routes) {
+    it(`routes ${key} to ${detector}`, async () => {
+      const spans = await detect(`${key}=zqvx7`, { config });
+      expect(spans.map((s) => s.detector)).toEqual([detector]);
+    });
+  }
+
   it("catches an X-Api-Key header and its logfmt form", async () => {
     const input = "X-Api-Key: 9f8a7b6c5d4e3f2a1b0c\nx-api-key=abcdef0123456789";
     const spans = await detect(input, { config });
