@@ -10,8 +10,31 @@
   import * as Dialog from './ui/dialog/index.ts'
   import { Switch } from './ui/switch/index.ts'
 
-  const SALT_KEY = 'leshy-salt'
-  const OVERRIDES_KEY = 'leshy-overrides'
+  const KEY = 'leshy-settings'
+  // Pre-v1 storage: overrides and salt under two keys. Read once, then dropped.
+  const LEGACY = { overrides: 'leshy-overrides', salt: 'leshy-salt' }
+
+  type Stored = {
+    v: 1
+    disable?: string[]
+    enable?: string[]
+    countries?: string[]
+    locale?: LocaleSetting
+    semanticEnabled?: boolean
+    salt?: string
+  }
+
+  const load = (): Partial<Stored> => {
+    try {
+      const raw = localStorage.getItem(KEY)
+      if (raw) return JSON.parse(raw) as Stored
+      const legacy = JSON.parse(localStorage.getItem(LEGACY.overrides) ?? '{}') as Partial<Stored>
+      const salt = localStorage.getItem(LEGACY.salt)
+      return salt ? { ...legacy, salt } : legacy
+    } catch {
+      return {} // malformed storage reads as no settings
+    }
+  }
 
   // The worker resolves the same file; the UI must diff its toggles against
   // that baseline, or a detector enabled in the config shows as off here.
@@ -36,40 +59,24 @@
     const all = base.detectors
     const disable = all.filter((d) => defaults[d.id] && !enabled[d.id]).map((d) => d.id)
     const enable = all.filter((d) => !defaults[d.id] && enabled[d.id]).map((d) => d.id)
-    // The overrides cross postMessage, which cannot clone a $state proxy.
-    const saved = {
-      disable,
-      enable,
-      countries: $state.snapshot(countries),
-      locale,
-      semanticEnabled: semantic,
-    }
-    session.setOverrides({ ...saved, ...(salt ? { salt } : {}) })
-    localStorage.setItem(OVERRIDES_KEY, JSON.stringify(saved))
-    if (salt) localStorage.setItem(SALT_KEY, salt)
-    else localStorage.removeItem(SALT_KEY)
+    const overrides = { disable, enable, countries, locale, semanticEnabled: semantic }
+    session.setOverrides({ ...overrides, ...(salt ? { salt } : {}) })
+    const stored: Stored = { v: 1, ...overrides, ...(salt ? { salt } : {}) }
+    localStorage.setItem(KEY, JSON.stringify(stored))
+    localStorage.removeItem(LEGACY.overrides)
+    localStorage.removeItem(LEGACY.salt)
   }
 
   onMount(() => {
-    salt = localStorage.getItem(SALT_KEY) ?? ''
-    try {
-      const saved = JSON.parse(localStorage.getItem(OVERRIDES_KEY) ?? '{}') as {
-        disable?: string[]
-        enable?: string[]
-        countries?: string[]
-        locale?: LocaleSetting
-        semanticEnabled?: boolean
-      }
-      if (saved.semanticEnabled === false) semantic = false
-      if (saved.countries) countries = saved.countries.filter((id) => packs.some((p) => p.id === id))
-      if (saved.locale && (saved.locale === 'auto' || locales.includes(saved.locale))) {
-        locale = saved.locale
-      }
-      for (const id of saved.disable ?? []) enabled[id] = false
-      for (const id of saved.enable ?? []) enabled[id] = true
-    } catch {
-      // ignore malformed storage
+    const saved = load()
+    salt = saved.salt ?? ''
+    if (saved.semanticEnabled === false) semantic = false
+    if (saved.countries) countries = saved.countries.filter((id) => packs.some((p) => p.id === id))
+    if (saved.locale && (saved.locale === 'auto' || locales.includes(saved.locale))) {
+      locale = saved.locale
     }
+    for (const id of saved.disable ?? []) enabled[id] = false
+    for (const id of saved.enable ?? []) enabled[id] = true
     apply()
   })
 
