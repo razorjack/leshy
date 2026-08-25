@@ -11,8 +11,7 @@ const SOURCE_TIER = {
 const TIMESTAMP_SHAPE =
   /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|\s?[+-]\d{2}:?\d{2})?)?$/;
 
-export const spanTier = (s: Span, override?: number): number =>
-  override ?? (s.validated ? TIER.VALIDATED : SOURCE_TIER[s.source]);
+export const spanTier = (s: Span): number => (s.validated ? TIER.VALIDATED : SOURCE_TIER[s.source]);
 
 interface Range {
   start: number;

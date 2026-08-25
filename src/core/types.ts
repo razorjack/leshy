@@ -116,11 +116,6 @@ export interface DetectorBase {
   type: EntityType;
   enabled: boolean;
   /**
-   * Overrides the source-derived tier. Rarely needed: structural detectors
-   * with validate() are promoted to TIER.VALIDATED automatically.
-   */
-  precedence?: number;
-  /**
    * Key-context boost: when a key matching this pattern is found in the input
    * (any of the supported syntaxes — JSON, Ruby, JS, logfmt), its value
    * becomes a span of this detector at TIER.KEY_CONTEXT.
