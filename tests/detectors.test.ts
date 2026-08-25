@@ -12,6 +12,13 @@ const types = (input: string, detectors = all): string[] =>
   [...new Set(detectStructural(input, detectors).map((s) => s.type))].sort();
 
 describe("structural detectors", () => {
+  it("leaves loopback addresses alone", async () => {
+    const doc = "listening on ::1 and 127.0.0.1, peer 10.0.0.5";
+    const r = await scrub(doc, { config: resolveConfig() });
+    expect(r.output).toContain("::1 and 127.0.0.1");
+    expect(r.output).not.toContain("10.0.0.5");
+  });
+
   it("leaves the host of a URL with credentials readable", async () => {
     const r = await scrub("upstream=postgres://appuser:tr0ub4dor@db.internal:5432/app", {
       config: resolveConfig(),

@@ -4,6 +4,11 @@ import type { PreserveRule } from "./types.ts";
 export const TIMESTAMP =
   /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|\s?[+-]\d{2}:?\d{2})?)?$/;
 
+// Loopback and unspecified IPv4 name the machine itself, not a peer. The IPv6
+// forms are validated matches, which outrank preserve rules, so the ipv6
+// validator rejects those itself.
+const LOOPBACK = /^(?:127\.\d{1,3}\.\d{1,3}\.\d{1,3}|0\.0\.0\.0)$/;
+
 // RFC 5737 TEST-NET ranges — Leshy's fake namespace for public IPv4s.
 const TEST_NET = /^(?:192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}$/;
 
@@ -36,6 +41,11 @@ export const defaultPreserve: PreserveRule[] = [
     id: "timestamps",
     keys: /(?:^|_)(?:created|updated|deleted)_?(?:at|on)$|timestamp/i,
     match: TIMESTAMP,
+    enabled: true,
+  },
+  {
+    id: "loopback",
+    match: LOOPBACK,
     enabled: true,
   },
   {

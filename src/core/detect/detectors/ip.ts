@@ -23,7 +23,7 @@ export const ipv6: StructuralDetector = {
   enabled: true,
   match: /(?<![:.\w])[0-9A-Fa-f:]{2,45}(?![:.\w])/g,
   validate: (text) => {
-    if (!text.includes(":")) return false;
+    if (!text.includes(":") || text === "::1") return false; // loopback is not a peer
     const parts = text.split("::");
     if (parts.length > 2) return false;
     const groups = (side: string): string[] => (side === "" ? [] : side.split(":"));
