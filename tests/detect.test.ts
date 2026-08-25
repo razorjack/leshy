@@ -38,6 +38,17 @@ describe("detection without the model (structural + key-context)", () => {
   }
 });
 
+describe("key-value scanning", () => {
+  it("yields one pair per query parameter, the first included", () => {
+    const kvs = scanKeyValues("GET https://x.io/u?token=abc123def456&api_key=zzz9 ok");
+    expect(kvs.map((k) => `${k.key}=${k.value}`)).toEqual([
+      "https=//x.io/u",
+      "token=abc123def456",
+      "api_key=zzz9",
+    ]);
+  });
+});
+
 describe("resolve stage", () => {
   const semanticSpan = (input: string, text: string, type: string, score = 0.9): Span => {
     const start = input.indexOf(text);
