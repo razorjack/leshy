@@ -3,6 +3,7 @@
   import type { Replacement } from '../../core/types.ts'
   import { splitOutput } from '../segments.ts'
   import TokenMark from './TokenMark.svelte'
+  import ReplacementsTable from './ReplacementsTable.svelte'
   import { markClass } from '../marks.ts'
   import { Button } from './ui/button/index.ts'
   import * as Tooltip from './ui/tooltip/index.ts'
@@ -24,6 +25,10 @@
   const total = $derived(session.replacements.length)
   const detail = $derived(byType.map(([type, n]) => `${n} ${type}`).join(', '))
   const summary = $derived(total > 0 ? `${total} replaced: ${detail}` : 'Nothing replaced')
+
+  // The text view is the deliverable; the table answers "what became what"
+  // when the marks have scrolled out of sight.
+  let view = $state<'text' | 'table'>('text')
 
   // The Clipboard API rejects when the permission is denied or the document is
   // not focused; say so on the button rather than failing silently.
@@ -62,9 +67,26 @@
       {/if}
     </div>
     {#if hasOutput}
-      <Button variant="ghost" size="sm" class="-my-1 h-7 text-xs" onclick={copy}>
-        {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
-      </Button>
+      <div class="flex items-center gap-1">
+        <div class="-my-1 flex rounded-md border border-border p-0.5 text-xs" role="tablist">
+          {#each [['text', 'Text'], ['table', 'Table']] as const as [id, title] (id)}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === id}
+              class="rounded-sm px-2 py-0.5 {view === id
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground'}"
+              onclick={() => (view = id)}
+            >
+              {title}
+            </button>
+          {/each}
+        </div>
+        <Button variant="ghost" size="sm" class="-my-1 h-7 text-xs" onclick={copy}>
+          {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
+        </Button>
+      </div>
     {/if}
   </div>
   {#if session.kept.length > 0}
@@ -85,8 +107,10 @@
       {/each}
     </ul>
   {/if}
-  <div class="flex-1 overflow-auto p-6 font-mono text-sm">
-    {#if hasOutput}
+  <div class="flex min-h-0 flex-1 flex-col overflow-auto p-6 font-mono text-sm">
+    {#if hasOutput && view === 'table'}
+      <ReplacementsTable />
+    {:else if hasOutput}
       <Tooltip.Provider delayDuration={200}>
         <!-- prettier-ignore -->
         <div class="whitespace-pre-wrap break-words"
