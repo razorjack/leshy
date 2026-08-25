@@ -43,10 +43,14 @@ export interface ConfigOverrides {
   semanticEnabled?: boolean;
 }
 
+// A toggle in the UI is the later decision, so it wins over the config's lists.
 const applyOverrides = (config: LeshyConfig, o: ConfigOverrides): LeshyConfig => ({
   ...config,
-  disable: [...(config.disable ?? []), ...(o.disable ?? [])],
-  enable: [...(config.enable ?? []), ...(o.enable ?? [])],
+  disable: [
+    ...(config.disable ?? []).filter((id) => !o.enable?.includes(id)),
+    ...(o.disable ?? []),
+  ],
+  enable: [...(config.enable ?? []).filter((id) => !o.disable?.includes(id)), ...(o.enable ?? [])],
   countries: o.countries ?? config.countries,
   locale: o.locale ?? config.locale,
   salt: o.salt ?? config.salt,

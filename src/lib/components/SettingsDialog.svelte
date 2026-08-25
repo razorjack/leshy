@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { SlidersHorizontal } from '@lucide/svelte'
+  import userConfig from '../../../leshy.config.ts'
   import { session } from '../../state/session.svelte.ts'
   import { resolveConfig } from '../../core/config.ts'
   import { packs } from '../../core/packs/index.ts'
@@ -12,7 +13,9 @@
   const SALT_KEY = 'leshy-salt'
   const OVERRIDES_KEY = 'leshy-overrides'
 
-  const base = resolveConfig()
+  // The worker resolves the same file; the UI must diff its toggles against
+  // that baseline, or a detector enabled in the config shows as off here.
+  const base = resolveConfig(userConfig)
   const defaults: Record<string, boolean> = Object.fromEntries(
     base.detectors.map((d) => [d.id, d.enabled]),
   )
@@ -20,12 +23,12 @@
   let enabled = $state<Record<string, boolean>>({ ...defaults })
   let countries = $state<string[]>([...base.countries])
   let locale = $state<LocaleSetting>(base.locale)
-  let semantic = $state(true)
+  let semantic = $state(base.semantic.enabled)
   let salt = $state('')
 
   // Deselecting a country takes its detectors out of the config, so the list
   // below shows exactly what is running rather than every rule Leshy ships.
-  const detectors = $derived(resolveConfig({ countries }).detectors)
+  const detectors = $derived(resolveConfig(userConfig, { countries }).detectors)
 
   // Derive the serialisable overrides from the toggle state relative to the
   // built-in defaults, push them to the session (re-scrubs) and persist them.

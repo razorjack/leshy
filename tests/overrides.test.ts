@@ -32,6 +32,11 @@ describe("config overrides", () => {
     expect(de.replacements.length).toBe(base.replacements.length);
   });
 
+  it("a UI toggle wins over the config's own disable list", async () => {
+    const config = resolveConfig({ disable: ["email"] }, { enable: ["email"] });
+    expect((await scrub(input, { config })).output).not.toBe(input);
+  });
+
   it("a match-only preserve rule spares spans of that shape", async () => {
     const doc = "build 10.2.3.4 host 10.2.3.5";
     const config = resolveConfig({
