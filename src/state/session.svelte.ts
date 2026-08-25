@@ -17,6 +17,11 @@ class Session {
   input = $state("");
   output = $state("");
   replacements = $state<Replacement[]>([]);
+  /**
+   * The input `output` and `replacements` were produced from. While it differs
+   * from `input` the source ranges no longer index what the user sees.
+   */
+  scrubbedFrom = $state("");
   stage = $state<SessionStage>("idle");
   error = $state<string | undefined>(undefined);
 
@@ -47,6 +52,7 @@ class Session {
       this.running = false;
       this.output = "";
       this.replacements = [];
+      this.scrubbedFrom = "";
       this.stage = "idle";
       this.error = undefined;
       return;
@@ -78,6 +84,7 @@ class Session {
       if (token !== this.token) return; // superseded by a newer request
       this.output = result.output;
       this.replacements = result.replacements;
+      this.scrubbedFrom = value;
       this.stage = "done";
     } catch (e) {
       if (token !== this.token) return; // superseded — its rejection is expected

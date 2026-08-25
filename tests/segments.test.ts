@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { scrub } from "../src/core/engine.ts";
 import { resolveConfig } from "../src/core/config.ts";
-import { splitOutput } from "../src/lib/segments.ts";
+import { splitInput, splitOutput } from "../src/lib/segments.ts";
 import type { Replacement } from "../src/core/types.ts";
 
 const config = resolveConfig();
@@ -46,5 +46,27 @@ describe("splitOutput", () => {
 
   it("returns a single text segment when there are no replacements", () => {
     expect(splitOutput("plain text", [])).toEqual([{ kind: "text", text: "plain text" }]);
+  });
+});
+
+describe("splitInput", () => {
+  it("marks cover the values the fakes replaced and reconstruct the input", async () => {
+    const input = '{"email":"jan.kowalski@gmail.com","pesel":"44051401359"}';
+    const { output, replacements } = await scrub(input, { config });
+    const segs = splitInput(input, replacements);
+    for (const seg of segs) {
+      if (seg.kind === "mark") {
+        expect(input.slice(seg.rep.sourceStart, seg.rep.sourceEnd)).toBe(seg.text);
+      }
+    }
+    expect(segs.map((s) => s.text).join("")).toBe(input);
+    expect(segs.filter((s) => s.kind === "mark").map((s) => s.text)).toEqual([
+      "jan.kowalski@gmail.com",
+      "44051401359",
+    ]);
+    // one mark per replacement, on both sides
+    expect(segs.filter((s) => s.kind === "mark")).toHaveLength(
+      splitOutput(output, replacements).filter((s) => s.kind === "mark").length,
+    );
   });
 });

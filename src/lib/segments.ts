@@ -1,22 +1,34 @@
 import type { Replacement } from "../core/types.ts";
 
-export type Segment = { kind: "text"; text: string } | { kind: "mark"; rep: Replacement };
+export type Segment =
+  | { kind: "text"; text: string }
+  | { kind: "mark"; text: string; rep: Replacement };
+
+type Range = (rep: Replacement) => [start: number, end: number];
 
 /**
- * Splits scrubbed output into verbatim text runs and replacement marks. Offsets
- * are output-coordinate UTF-16 indices (as the engine produced them), so the
- * concatenation of every segment reconstructs the output exactly — multi-byte
- * values included.
+ * Cuts text at the given replacement ranges. Offsets are UTF-16 indices as the
+ * engine produced them, so joining every segment's `text` reconstructs the
+ * source exactly — multi-byte values included.
  */
-export const splitOutput = (output: string, replacements: Replacement[]): Segment[] => {
-  const reps = [...replacements].sort((a, b) => a.start - b.start);
+const split = (text: string, replacements: Replacement[], range: Range): Segment[] => {
+  const reps = [...replacements].sort((a, b) => range(a)[0] - range(b)[0]);
   const segs: Segment[] = [];
   let cursor = 0;
   for (const rep of reps) {
-    if (rep.start > cursor) segs.push({ kind: "text", text: output.slice(cursor, rep.start) });
-    segs.push({ kind: "mark", rep });
-    cursor = rep.end;
+    const [start, end] = range(rep);
+    if (start > cursor) segs.push({ kind: "text", text: text.slice(cursor, start) });
+    segs.push({ kind: "mark", text: text.slice(start, end), rep });
+    cursor = end;
   }
-  if (cursor < output.length) segs.push({ kind: "text", text: output.slice(cursor) });
+  if (cursor < text.length) segs.push({ kind: "text", text: text.slice(cursor) });
   return segs;
 };
+
+/** Splits scrubbed output into verbatim runs and the fakes that were written in. */
+export const splitOutput = (output: string, replacements: Replacement[]): Segment[] =>
+  split(output, replacements, (rep) => [rep.start, rep.end]);
+
+/** Splits the pasted input the same way, around the values those fakes replaced. */
+export const splitInput = (input: string, replacements: Replacement[]): Segment[] =>
+  split(input, replacements, (rep) => [rep.sourceStart, rep.sourceEnd]);

@@ -24,6 +24,7 @@ scrub: per span — normalise → seed → detector.generate → collision/chars
   │            src/core/engine.ts + generate/      (ADR-0002)
   ▼
 { output, replacements[] }  ── postMessage ──▶  OutputPane renders text + <TokenMark>
+                                                InputPane marks what each fake replaced
                                                 copy button writes raw output to clipboard
 ```
 
@@ -65,7 +66,7 @@ src/worker/
 src/state/session.svelte.ts runes store: input/output/replacements/stage + worker lifecycle
 src/lib/
   theme.ts                  light / dark / system, applied before first paint
-  segments.ts               splits output into verbatim text runs and replacement marks
+  segments.ts               splits input and output into verbatim runs and marks
   components/               App shell parts + shadcn-svelte ui/ (generated)
 src/App.svelte, main.ts     shell layout; main.ts sets the theme, then mounts
 electron/main.ts            desktop shell — serves dist/ from app://leshy (ADR-0007)
@@ -133,9 +134,11 @@ The desktop shell (adr/0007) is its own host: `electron/main.ts` serves `dist/` 
 
 ## State & UI
 
-One runes store (`session.svelte.ts`) owns input, output, replacements, stage, error and
-the worker lifecycle. Components are thin: `InputPane` (textarea, paste, spellcheck and
-extensions off so nothing but Leshy reads the paste), `OutputPane` (output split around
+One runes store (`session.svelte.ts`) owns input, output, replacements, the input those
+replacements were computed from, stage, error and the worker lifecycle. Components are
+thin: `InputPane` (textarea over a mirror div that carries the highlights a textarea
+cannot hold, paste, spellcheck and extensions off so nothing but Leshy reads the paste),
+`OutputPane` (output split around
 replacements into text + `TokenMark` marks, a tally by entity type, and copy =
 `navigator.clipboard.writeText(session.output)`), `ThemeToggle` (light / dark / system),
 and the settings dialog (detectors, countries, locale, salt, model on/off). No router, no
