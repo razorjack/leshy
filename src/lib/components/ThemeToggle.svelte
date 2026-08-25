@@ -2,11 +2,8 @@
   import { Moon, Sun } from '@lucide/svelte'
   import { currentTheme, toggleTheme, type Theme } from '../theme.ts'
 
-  // initTheme() (main.ts) has already applied the class before mount.
-  let theme = $state<Theme>('light')
-  $effect(() => {
-    theme = currentTheme()
-  })
+  // initTheme() (main.ts) applied the class before mount, so this reads it back.
+  let theme = $state<Theme>(currentTheme())
 </script>
 
 <button
