@@ -86,23 +86,34 @@ const mac: Generate = (ctx) => {
   return [first, ...rest].join(sep);
 };
 
-// E.164 country codes are 1–3 digits. Separator-less numbers ("+14155552671")
-// give the layout no boundary to stop at, so cap the run: without the cap the
-// whole number counts as country code and the fake reproduces the source.
-const MAX_COUNTRY_CODE_DIGITS = 3;
+// E.164 country codes are prefix-free: zones 1 and 7 are one digit, and among
+// the rest these are the two-digit codes; every other code is three digits.
+const TWO_DIGIT_CC = new Set(
+  "20 27 30 31 32 33 34 36 39 40 41 43 44 45 46 47 48 49 51 52 53 54 55 56 57 58 60 61 62 63 64 65 66 81 82 84 86 90 91 92 93 94 95 98".split(
+    " ",
+  ),
+);
 
+const countryCodeLength = (digits: string): number => {
+  if (digits.startsWith("1") || digits.startsWith("7")) return 1;
+  return TWO_DIGIT_CC.has(digits.slice(0, 2)) ? 2 : 3;
+};
+
+// The fake is a function of the digit sequence, not of its layout: draw one
+// digit per source digit, keep the country code after a leading '+', then lay
+// the result into the source's separators. "+48 601 234 567", "+48601234567"
+// and "48 601 234 567" are one identity and must read as one fake.
 const phone: Generate = (ctx) => {
   const f = fakerFor(ctx.seed, "en");
-  const chars = Array.from(ctx.original);
-  // Keep the country-code digit run right after a leading '+'; the layout
-  // (spaces, dashes, parens) survives because only digit chars are swapped.
-  const keep = new Set<number>();
-  const plus = ctx.original.indexOf("+");
-  if (plus >= 0) {
-    const limit = Math.min(chars.length, plus + 1 + MAX_COUNTRY_CODE_DIGITS);
-    for (let i = plus + 1; i < limit && /\d/.test(chars[i]!); i++) keep.add(i);
-  }
-  return chars.map((c, i) => (/\d/.test(c) && !keep.has(i) ? digit(f) : c)).join("");
+  const digits = ctx.normalized.replace(/\D/g, "");
+  const keep = ctx.original.trimStart().startsWith("+") ? countryCodeLength(digits) : 0;
+  // One draw per position, kept or not, so the stream stays aligned across layouts.
+  const fake = Array.from(digits, (d, k) => {
+    const drawn = digit(f);
+    return k < keep ? d : drawn;
+  });
+  let k = 0;
+  return Array.from(ctx.original, (c) => (/\d/.test(c) ? (fake[k++] ?? c) : c)).join("");
 };
 
 /** Luhn check digit for a digit prefix (the appended digit sits un-doubled). */

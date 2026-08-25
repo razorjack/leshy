@@ -112,6 +112,16 @@ describe("shape-preserving digit generators", () => {
     );
   });
 
+  it("phone reads as one fake however the source is laid out", async () => {
+    const spaced = await fakeOf("phone", "+48 601 234 567", "phone");
+    const bare = await fakeOf("phone", "+48601234567", "phone");
+    const noPlus = await fakeOf("phone", "48 601 234 567", "phone");
+    expect(bare).toBe(spaced.replaceAll(" ", ""));
+    expect(noPlus.replaceAll(" ", "").slice(2)).toBe(bare.slice(3));
+    expect(await fakeOf("phone", "+14155552671", "phone")).toMatch(/^\+1\d{10}$/);
+    expect(await fakeOf("phone", "+3546001234", "phone")).toMatch(/^\+354\d{7}$/);
+  });
+
   it("phone replaces separator-less numbers instead of echoing them", async () => {
     for (const src of ["+14155552671", "+48601234567"]) {
       const fake = await fakeOf("phone", src, "phone");
@@ -173,7 +183,7 @@ describe("shape-preserving digit generators", () => {
   });
 
   it("digit generators are deterministic (fixed salt ⇒ exact strings)", async () => {
-    expect(await fakeOf("phone", "+48 601 234 567", "phone")).toBe("+48 252 220 709");
+    expect(await fakeOf("phone", "+48 601 234 567", "phone")).toBe("+48 222 070 920");
     expect(await fakeOf("credit-card", "4111 1111 1111 1111", "credit-card")).toBe(
       "4378 1130 5910 0583",
     );

@@ -9,7 +9,7 @@ const config = resolveConfig();
 // Default-salt golden outputs, structural + key-context only (no model).
 const golden: Record<string, string> = {
   "json-nested":
-    '{"user":{"id":42,"email":"shelley.stiedemann@frivolous-safe.example","full_name":"Shelley Stiedemann","phone":"+48 252 220 709","address":"rondo Kozłowski 50c, 67-893 Giżycko","pesel":"29410462712"}}',
+    '{"user":{"id":42,"email":"shelley.stiedemann@frivolous-safe.example","full_name":"Shelley Stiedemann","phone":"+48 222 070 920","address":"rondo Kozłowski 50c, 67-893 Giżycko","pesel":"29410462712"}}',
   "ruby-inspect":
     '#<User id: 42, email: "shelley.stiedemann@frivolous-safe.example", first_name: "Logan", last_name: "Joany", created_at: "2024-01-02 10:00:00 +0100">',
   "ruby-hash":
