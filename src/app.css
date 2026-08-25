@@ -52,12 +52,14 @@
   --input: oklch(0.87 0.015 110);
   --ring: oklch(0.55 0.1 158);
 
-  /* replaced-token highlight (moss tint); per-group hues override it below */
+  /* replaced-token highlight (moss tint); the .mark-* classes below change the
+     hue per entity group. Composed in @theme inline, not here: a colour
+     assembled on :root would freeze the hue before any class could change it. */
   --mark-l: 0.42;
   --mark-c: 0.09;
   --mark-h: 158;
-  --mark: oklch(var(--mark-l) var(--mark-c) var(--mark-h) / 0.13);
-  --mark-border: oklch(var(--mark-l) var(--mark-c) var(--mark-h) / 0.45);
+  --mark-a: 0.13;
+  --mark-border-a: 0.45;
 
   --chart-1: oklch(0.42 0.09 158);
   --chart-2: oklch(0.62 0.08 125);
@@ -99,8 +101,8 @@
   --mark-l: 0.68;
   --mark-c: 0.11;
   --mark-h: 155;
-  --mark: oklch(var(--mark-l) var(--mark-c) var(--mark-h) / 0.16);
-  --mark-border: oklch(var(--mark-l) var(--mark-c) var(--mark-h) / 0.5);
+  --mark-a: 0.16;
+  --mark-border-a: 0.5;
 
   --chart-1: oklch(0.68 0.11 155);
   --chart-2: oklch(0.75 0.08 125);
@@ -148,8 +150,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-mark: var(--mark);
-  --color-mark-border: var(--mark-border);
+  --color-mark: oklch(var(--mark-l) var(--mark-c) var(--mark-h) / var(--mark-a));
+  --color-mark-border: oklch(var(--mark-l) var(--mark-c) var(--mark-h) / var(--mark-border-a));
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
