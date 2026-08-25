@@ -102,6 +102,14 @@ describe("structured generators — determinism (fixed salt ⇒ exact strings)",
 });
 
 describe("shape-preserving digit generators", () => {
+  it("username links to the person and keeps the login shape", async () => {
+    const email = await fakeOf("email", "jan.kowalski@gmail.com", "email");
+    const login = await fakeOf("username", "jan.kowalski", "username");
+    expect(login).toBe(email.slice(0, email.indexOf("@")));
+    expect(await fakeOf("username", "jan_kowalski", "username")).toBe(login.replace(".", "_"));
+    expect(await fakeOf("username", "jdoe42", "username")).toMatch(/^[a-z]+\d{2}$/);
+  });
+
   it("birth date keeps its layout and stays a valid date in either day-month order", async () => {
     for (const src of ["1984-05-12", "12/05/1984", "05.12.84", "1984-05-12T00:00:00Z"]) {
       const fake = await fakeOf("dob", src, "dob");

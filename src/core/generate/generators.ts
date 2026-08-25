@@ -299,6 +299,25 @@ const person: Generate = (ctx) => {
   return names.map((n, i) => matchCase(n, words[i] ?? "")).join(" ");
 };
 
+// A login links to the person the same way an email local part does, keeps
+// the source's separator style and its trailing digits (reshaped), and stays
+// within the charset logins are made of.
+const username: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  const tokens = nameTokens(ctx.original);
+  let name: string;
+  if (tokens) {
+    const { first, last } = personParts(ctx.personSeed(tokens), ctx.localeFor(tokens.join(" ")));
+    const sep = ctx.original.match(/[._-]/)?.[0] ?? "";
+    name = tokens.length > 1 ? `${first}${sep}${last}` : first;
+  } else {
+    name = f.internet.username();
+  }
+  const digits = ctx.original.match(/\d+$/)?.[0] ?? "";
+  const tail = Array.from(digits, () => digit(f)).join("");
+  return `${matchCase(name, ctx.original).replace(/[^A-Za-z0-9._-]/g, "") || "user"}${tail}`;
+};
+
 const address: Generate = (ctx) => {
   const locale = ctx.localeFor();
   const f = fakerFor(ctx.seed, locale);
@@ -375,6 +394,7 @@ export const generators = {
   "card-code": cardCode,
   "card-expiry": cardExpiry,
   person,
+  username,
   address,
   street,
   city,

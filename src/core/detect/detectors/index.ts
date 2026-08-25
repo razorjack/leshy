@@ -18,6 +18,7 @@ import {
 } from "./secret.ts";
 import { uuid } from "./uuid.ts";
 import { person } from "./person.ts";
+import { username } from "./username.ts";
 import { address, city, postcode, street } from "./address.ts";
 import { org } from "./org.ts";
 import { birthDate } from "./birthDate.ts";
@@ -49,6 +50,7 @@ export const builtins: Detector[] = [
   ipv4,
   phone,
   uuid,
+  username,
   person,
   street,
   city,

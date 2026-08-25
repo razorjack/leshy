@@ -8,6 +8,6 @@ export const person: SemanticDetector = {
   kind: "semantic",
   enabled: true,
   labels: ["person"],
-  keys: /(?:^|_)(?:first|last|full|middle|given|family|maiden|user)_?name$|^(?:name|surname)$/i,
+  keys: /(?:^|_)(?:first|last|full|middle|given|family|maiden)_?name$|^(?:name|surname)$/i,
   generate: generators.person,
 };

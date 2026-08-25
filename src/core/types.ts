@@ -11,6 +11,7 @@ export type { Locale };
 /** Built-in entity types. Custom detectors may introduce new string ids. */
 export type EntityType =
   | "person"
+  | "username"
   | "org"
   | "address"
   | "street"
