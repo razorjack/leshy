@@ -1,18 +1,21 @@
 import type { Detector, SemanticDetector, Span } from "../../types.ts";
 import type { Gliner } from "./gliner/runtime.ts";
+import { WordSplitter } from "./gliner/processor.ts";
 
 // The model has a bounded context, so long inputs are windowed by word count
 // (adr/0003). The overlap guarantees any entity shorter than it is wholly
-// inside at least one window, so nothing is lost at a window seam.
+// inside at least one window, so nothing is lost at a window seam. Words are
+// counted the way the model counts them: every brace, quote and comma is one,
+// so a minified JSON line does not become a single window of thousands of
+// tokens and a span enumeration twelve times that size.
 const CHUNK_WORDS = 250;
 const OVERLAP_WORDS = 40;
 
+const splitter = new WordSplitter();
+
 /** Char ranges of ~CHUNK_WORDS-word windows over the input, OVERLAP_WORDS-shared. */
 const windows = (input: string): Array<{ start: number; end: number }> => {
-  const words = Array.from(input.matchAll(/\S+/g), (m) => ({
-    start: m.index,
-    end: m.index + m[0].length,
-  }));
+  const words = Array.from(splitter.split(input), ([, start, end]) => ({ start, end }));
   if (words.length === 0) return [];
   if (words.length <= CHUNK_WORDS) return [{ start: 0, end: input.length }];
 

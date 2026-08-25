@@ -46,6 +46,28 @@ describe("semantic chunking", () => {
     for (const s of spans) expect(input.slice(s.start, s.end)).toBe(s.text);
   });
 
+  it("counts words the way the model does, so minified JSON is windowed too", async () => {
+    const record = (i: number): string =>
+      `{"id":${i},"email":"u${i}@corp.io","tags":["a","b"],"created_at":"2024-01-02T10:00:00Z"}`;
+    const records = Array.from({ length: 120 }, (_, i) => record(i));
+    records[0] = '{"assignee":"Zorluk"}';
+    records[119] = '{"assignee":"Perrundle"}';
+    const input = `[${records.join(",")}]`;
+    expect(input.match(/\S+/g)).toHaveLength(1);
+
+    const seen: number[] = [];
+    const counting = {
+      extractEntities: (text: string): Promise<GlinerEntity[]> => {
+        seen.push(text.length);
+        return mockGliner.extractEntities(text, [], {});
+      },
+    } as unknown as Gliner;
+    const spans = await detectSemantic(input, detectors, counting, 0.35);
+    expect(seen.length).toBeGreaterThan(1);
+    expect(Math.max(...seen)).toBeLessThan(input.length);
+    expect(spans.map((s) => s.text).sort()).toEqual(["Perrundle", "Zorluk"]);
+  });
+
   it("handles a short input as a single window", async () => {
     const input = "escalate to Zorluk about the outage";
     const spans = await detectSemantic(input, detectors, mockGliner, 0.35);
