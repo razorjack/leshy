@@ -124,41 +124,33 @@ const mergeAdjacent = (spans: Span[], input: string): Span[] => {
   return out;
 };
 
-/**
- * Turns raw detector output into a non-overlapping, precedence-resolved span
- * list ready for substitution. Validated in the spike (scripts/spike).
- *
- * Steps: filter semantic noise → merge semantic fragments → apply preserve
- * rules → resolve overlaps by tier, trimming losers to their uncovered
- * remainder so coverage never shrinks.
- */
-export const resolve = (
-  rawSpans: Span[],
-  input: string,
-  detectors: Detector[],
-  preserve: PreserveRule[],
-  kvs?: KeyValue[],
-): Span[] => {
-  const keyValues = kvs ?? scanKeyValues(input);
-  const activePreserve = preserve.filter((r) => r.enabled);
-
-  const preserved: Range[] = [];
-  for (const rule of activePreserve) {
+/** Value ranges under keys a preserve rule names (optionally shape-checked). */
+const preservedRanges = (rules: PreserveRule[], kvs: KeyValue[]): Range[] => {
+  const out: Range[] = [];
+  for (const rule of rules) {
     if (!rule.keys) continue;
-    for (const kv of keyValues) {
+    for (const kv of kvs) {
       if (rule.keys.test(kv.key) && (!rule.match || rule.match.test(kv.value))) {
-        preserved.push({ start: kv.valueStart, end: kv.valueEnd });
+        out.push({ start: kv.valueStart, end: kv.valueEnd });
       }
     }
   }
-  const preserveRegions = sortMerged(preserved);
-  const shapeRules = activePreserve.filter((r) => !r.keys && r.match);
-  const preservedShape = (s: Span): boolean => shapeRules.some((r) => r.match?.test(s.text));
+  return sortMerged(out);
+};
 
-  // Corroboration applies to types the model does NOT own: when no semantic
-  // detector claims a type (email, phone, ip…), a lone model guess of that
-  // type is noise unless a structural match overlaps it. Types with a semantic
-  // owner (person, address, org) trust the model outright.
+/**
+ * Model output the rules know better than to trust: pure timestamps and bare
+ * numbers, spans in key position (right before `:`, `=>` or `=`), and — for
+ * types the model does not own (email, phone, ip…) — a lone guess with no
+ * structural match under it. Types with a semantic owner (person, address,
+ * org) trust the model outright.
+ */
+const dropSemanticNoise = (
+  semantic: Span[],
+  structural: Span[],
+  detectors: Detector[],
+  input: string,
+): Span[] => {
   const semanticTypes = new Set(
     detectors.filter((d) => d.enabled && d.kind === "semantic").map((d) => d.type),
   );
@@ -167,49 +159,51 @@ export const resolve = (
       .filter((d) => d.enabled && d.kind !== "semantic" && !semanticTypes.has(d.type))
       .map((d) => d.type),
   );
-  const structural = rawSpans.filter((s) => s.source === "structural");
   const structuralRegions = sortMerged(structural);
-
-  let semantic = rawSpans.filter((s) => s.source === "semantic");
-  semantic = semantic.filter((s) => {
-    // pure timestamps and bare numbers are never PII by themselves
+  return semantic.filter((s) => {
     if (TIMESTAMP.test(s.text) || /^\d+$/.test(s.text)) return false;
-    // a span in key position (right before : | => | =) names a field, not a value
     if (/^["']?\s*(?::|=>|=)/.test(input.slice(s.end, s.end + 5))) return false;
     if (corroborated.has(s.type)) return hits(structuralRegions, s);
     return true;
   });
+};
 
-  let spans = mergeAdjacent(
-    [...structural, ...rawSpans.filter((s) => s.source === "key-context"), ...semantic],
-    input,
-  );
+/**
+ * Fake-namespace values (Leshy's own output) define preserve regions, not
+ * just self-drops: the whole matched span is protected so a re-scrub is a
+ * no-op even when the model tags a fragment of a fake (a fake email's local
+ * part reads as a person/org). This is what makes idempotence hold (adr/0002).
+ */
+const dropFakes = (spans: Span[], rules: PreserveRule[]): Span[] => {
+  const fakeRegions = sortMerged(spans.filter((s) => rules.some((r) => r.isFake?.(s.text))));
+  return spans.filter((s) => !hits(fakeRegions, s));
+};
 
-  // Fake-namespace values (Leshy's own output) define preserve regions, not
-  // just self-drops: the whole matched span is protected so a re-scrub is a
-  // no-op even when the model tags a fragment of a fake (a fake email's local
-  // part reads as a person/org). This is what makes idempotence hold (adr/0002).
-  const fakeRegions = sortMerged(
-    spans.filter((s) => activePreserve.some((r) => r.isFake?.(s.text))),
-  );
-  spans = spans.filter((s) => !hits(fakeRegions, s));
+/** Preserve rules beat everything below TIER.VALIDATED. */
+const applyPreserve = (spans: Span[], rules: PreserveRule[], kvs: KeyValue[]): Span[] => {
+  const regions = preservedRanges(rules, kvs);
+  const shapes = rules.filter((r) => !r.keys && r.match);
+  const shaped = (s: Span): boolean => shapes.some((r) => r.match?.test(s.text));
+  return spans.filter((s) => spanTier(s) >= TIER.VALIDATED || !(hits(regions, s) || shaped(s)));
+};
 
-  // preserve rules beat everything below TIER.VALIDATED
-  spans = spans.filter(
-    (s) => spanTier(s) >= TIER.VALIDATED || !(hits(preserveRegions, s) || preservedShape(s)),
-  );
-
+/**
+ * Settle overlaps by tier, then length, then declaration order; a loser is
+ * trimmed to its uncovered remainder, never dropped, so coverage never shrinks.
+ * A remainder with no letter or digit in it is not worth a fake.
+ */
+const settleOverlaps = (spans: Span[], detectors: Detector[], input: string): Span[] => {
   const order = new Map(detectors.map((d, i) => [d.id, i]));
   const rank = (s: Span): number => order.get(s.detector) ?? detectors.length;
-  const chosen: Span[] = [];
-  const taken: Range[] = [];
-  const sorted = spans.sort(
+  const sorted = [...spans].sort(
     (a, b) =>
       spanTier(b) - spanTier(a) ||
       b.end - b.start - (a.end - a.start) ||
       rank(a) - rank(b) ||
       a.start - b.start,
   );
+  const chosen: Span[] = [];
+  const taken: Range[] = [];
   for (const s of sorted) {
     for (const p of subtract(taken, s)) {
       const text = input.slice(p.start, p.end);
@@ -219,4 +213,27 @@ export const resolve = (
     }
   }
   return chosen.sort((a, b) => a.start - b.start);
+};
+
+/**
+ * Turns raw detector output into a non-overlapping, precedence-resolved span
+ * list ready for substitution. Validated in the spike (scripts/spike).
+ */
+export const resolve = (
+  rawSpans: Span[],
+  input: string,
+  detectors: Detector[],
+  preserve: PreserveRule[],
+  kvs?: KeyValue[],
+): Span[] => {
+  const keyValues = kvs ?? scanKeyValues(input);
+  const rules = preserve.filter((r) => r.enabled);
+  const bySource = (source: Span["source"]): Span[] => rawSpans.filter((s) => s.source === source);
+  const structural = bySource("structural");
+  const semantic = dropSemanticNoise(bySource("semantic"), structural, detectors, input);
+
+  let spans = mergeAdjacent([...structural, ...bySource("key-context"), ...semantic], input);
+  spans = dropFakes(spans, rules);
+  spans = applyPreserve(spans, rules, keyValues);
+  return settleOverlaps(spans, detectors, input);
 };
