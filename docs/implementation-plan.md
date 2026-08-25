@@ -1,5 +1,12 @@
 # Implementation plan
 
+> **Status: done.** Steps 1–18 shipped. This file is the record of what was built in what
+> order, not a description of the current code — read `docs/architecture.md` and CLAUDE.md
+> for that. Two things moved afterwards: `fakerFor` takes any locale from
+> `generate/locales.ts`, not `'pl' | 'en'` (step 2), and the national ids and address
+> grammars of steps 3–5 now live in country packs under `src/core/packs/<iso2>/`
+> (ADR-0008).
+
 Execute top to bottom. Every architectural and policy decision is already made — if a
 step seems to need a new decision, the answer is in the referenced ADR. After **every**
 step: `npm run check && npm run test` must pass; after any detection-related step,

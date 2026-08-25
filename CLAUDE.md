@@ -8,7 +8,7 @@ over everything in its woods. Tagline: **"Nothing leaves the woods."**
 
 **Status**: implemented (plan steps 1–18 complete). Detection + generation + scrub are
 built and validated: `npm run check` + `npm run test` (unit + gold fixtures) green,
-`npm run spike` PASS (26/26 detection, scrub leak/preserve/idempotence/chunking). UI, the
+`npm run spike` PASS (30/30 detection, scrub leak/preserve/idempotence/chunking). UI, the
 in-worker model, PWA/offline wiring, settings, theming are in place; a checklist of
 browser-only QA (PWA install, offline reload, visual theme) lives in the final report.
 Decisions remain fixed (`docs/adr/`); deviations from the scaffold are recorded in the
@@ -63,30 +63,30 @@ src/core/       pure engine — types.ts is the contract surface, start reading 
   detect/       structural + key-context + semantic layers, resolve (tiers, ADR-0004)
   packs/        country packs: rules that only apply inside one country (ADR-0008)
   generate/     derivation + generators (locales.ts lists what Leshy generates in)
-  engine.ts     detect() real · scrub() stub (plan step 6)
-src/worker/     protocol + RPC client real · detect.worker.ts bootstrap stub (step 9)
-src/state/      session.svelte.ts runes store (step 10)
-src/lib/        components (App shell stubs; ui/ = generated shadcn, lint-exempt)
+  engine.ts     detect() and scrub()
+src/worker/     protocol + RPC client · detect.worker.ts (config, model bootstrap, loop)
+src/state/      session.svelte.ts runes store
+src/lib/        components (App shell; ui/ = generated shadcn, lint-exempt)
 electron/       desktop shell: main.ts only, serves dist/ from app://leshy (adr/0007)
 leshy.config.ts user detector config — code, statically imported by the worker
 scripts/        fetch-model, icons, linux-install, spike/ (the validation harness — keep PASSing)
 tests/          vitest + gold fixtures (tests/fixtures/samples.ts)
-docs/           architecture.md · implementation-plan.md · adr/0001–0007
+docs/           architecture.md · implementation-plan.md · adr/0001–0008
 ```
 
 ## Detection model in one paragraph
 
 Three layers produce spans over the raw text: structural regex+validators (email, phone,
-IP, Luhn…, plus the national ids and address grammars of the selected country packs —
-PESEL, Steuer-ID, SSN), a format-agnostic key-value scanner that flags values under
-PII-ish keys, and a zero-shot GLiNER model (gliner-x-small, in-worker) for names,
-addresses, orgs. `resolve()` filters model noise by rule, merges fragments, applies
-preserve rules (db ids, timestamps, Leshy's own fake namespaces) and settles overlaps by
-precedence tier (500 fake-preserve > 400 validated > 350 preserve > 300 structural >
-200 key-context > 100 semantic), merging same-type overlaps and trimming the rest so
-coverage never shrinks. A validator that only checks plausibility instead of proving
-the match marks its detector `heuristic` and stays at 300. Validated: 26/26 catches, 0
-preserve violations (`npm run spike`).
+IP, Luhn…, credential material such as auth headers, cookies and private keys, plus the
+national ids and address grammars of the selected country packs — PESEL, Steuer-ID, SSN),
+a format-agnostic key-value scanner that flags values under PII-ish keys, and a zero-shot
+GLiNER model (gliner-x-small, in-worker) for names, addresses, orgs. `resolve()` filters
+model noise by rule, merges fragments, applies preserve rules (db ids, timestamps,
+Leshy's own fake namespaces) and settles overlaps by precedence tier (500 fake-preserve >
+400 validated > 350 preserve > 300 structural > 200 key-context > 100 semantic), merging
+same-type overlaps and trimming the rest so coverage never shrinks. A validator that only
+checks plausibility instead of proving the match marks its detector `heuristic` and stays
+at 300. Validated: 30/30 catches, 0 preserve violations (`npm run spike`).
 
 ## Extending detection (the PESEL-class worked example)
 
