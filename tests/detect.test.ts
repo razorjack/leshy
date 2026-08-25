@@ -39,6 +39,12 @@ describe("detection without the model (structural + key-context)", () => {
 });
 
 describe("key routing", () => {
+  it("catches an X-Api-Key header and its logfmt form", async () => {
+    const input = "X-Api-Key: 9f8a7b6c5d4e3f2a1b0c\nx-api-key=abcdef0123456789";
+    const spans = await detect(input, { config });
+    expect(spans.map((s) => s.text)).toEqual(["9f8a7b6c5d4e3f2a1b0c", "abcdef0123456789"]);
+  });
+
   it("routes email_address to the email detector, not to address", async () => {
     const input = '{"email_address":"jan at gmail dot com"}';
     const spans = await detect(input, { config });
