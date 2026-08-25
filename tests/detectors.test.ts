@@ -12,6 +12,15 @@ const types = (input: string, detectors = all): string[] =>
   [...new Set(detectStructural(input, detectors).map((s) => s.type))].sort();
 
 describe("structural detectors", () => {
+  it("leaves the host of a URL with credentials readable", async () => {
+    const r = await scrub("upstream=postgres://appuser:tr0ub4dor@db.internal:5432/app", {
+      config: resolveConfig(),
+    });
+    expect(r.output).toMatch(/^upstream=postgres:\/\/[^\s@:]+:[^\s@:]+@db\.internal:5432\/app$/);
+    expect(r.output).not.toContain("tr0ub4dor");
+    expect(r.output).not.toContain("appuser");
+  });
+
   it("redacts a prefixed API key even under an id-like key", async () => {
     const r = await scrub("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE", { config: resolveConfig() });
     expect(r.output).not.toContain("AKIAIOSFODNN7EXAMPLE");
