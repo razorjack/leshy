@@ -31,13 +31,16 @@ class Session {
   private worker: ScrubWorker | undefined;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private token = 0;
-  private running = false;
 
   private ensureWorker(): ScrubWorker {
     if (!this.worker) {
       this.worker = new ScrubWorker();
+      // A progress message only matters while a run is in flight; a stale one
+      // must not revive the indicator after the input was cleared.
       this.worker.onStage = (stage) => {
-        if (this.running) this.stage = stage === "loading-model" ? "loading-model" : "working";
+        if (this.stage === "working" || this.stage === "loading-model") {
+          this.stage = stage === "loading-model" ? "loading-model" : "working";
+        }
       };
       this.worker.warmup();
     }
@@ -51,7 +54,6 @@ class Session {
     if (value.trim() === "") {
       this.token++; // cancel any in-flight response
       this.worker?.cancel(); // …and settle its promise
-      this.running = false;
       this.output = "";
       this.replacements = [];
       this.scrubbedFrom = "";
@@ -79,7 +81,6 @@ class Session {
   private async run(value: string): Promise<void> {
     const worker = this.ensureWorker();
     const token = ++this.token;
-    this.running = true;
     this.error = undefined;
     this.stage = "working";
     try {
@@ -94,8 +95,6 @@ class Session {
       if (token !== this.token) return; // superseded — its rejection is expected
       this.error = e instanceof Error ? e.message : String(e);
       this.stage = "error";
-    } finally {
-      if (token === this.token) this.running = false;
     }
   }
 }
