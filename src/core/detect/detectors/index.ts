@@ -9,12 +9,14 @@ import { jwt } from "./jwt.ts";
 import { apiKey } from "./apiKey.ts";
 import {
   authHeader,
+  awsSecret,
   cookie,
   password,
   privateKey,
   sessionId,
   token,
   urlCredentials,
+  webhook,
 } from "./secret.ts";
 import { uuid } from "./uuid.ts";
 import { person } from "./person.ts";
@@ -40,8 +42,10 @@ export const builtins: Detector[] = [
   sessionId,
   token,
   authHeader,
+  awsSecret,
   cookie,
   urlCredentials,
+  webhook,
   privateKey,
   apiKey,
   email,

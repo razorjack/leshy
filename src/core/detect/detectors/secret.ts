@@ -1,4 +1,4 @@
-import type { CustomDetector, KeyDetector, Span } from "../../types.ts";
+import type { CustomDetector, KeyDetector, Span, StructuralDetector } from "../../types.ts";
 import { generators } from "../../generate/generators.ts";
 
 /**
@@ -110,6 +110,39 @@ export const cookie: CustomDetector = {
     }
     return out;
   },
+  generate: generators.secret,
+};
+
+// Incoming webhook URLs are bearer credentials in disguise: the path is the
+// secret. Only the path is spanned, so the host still says which service it was.
+const WEBHOOK =
+  /\bhttps:\/\/(?:hooks\.slack\.com\/services\/|discord(?:app)?\.com\/api\/webhooks\/)([A-Za-z0-9_/-]{20,})/g;
+
+export const webhook: CustomDetector = {
+  id: "webhook",
+  label: "Webhook URL",
+  type: "secret",
+  kind: "custom",
+  enabled: true,
+  match: (input) => tail(input, WEBHOOK),
+  validate: () => true, // the host is the proof
+  generate: generators.secret,
+};
+
+// An AWS secret access key has no prefix: 40 base64 characters. Requiring
+// mixed case and a digit keeps hex digests (a git SHA-1 is also 40 chars) and
+// plain words out, but the shape only makes a candidate plausible.
+const AWS_SECRET = /(?<![A-Za-z0-9/+])[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+=])/g;
+
+export const awsSecret: StructuralDetector = {
+  id: "aws-secret",
+  label: "AWS secret key",
+  type: "secret",
+  kind: "structural",
+  enabled: true,
+  match: AWS_SECRET,
+  heuristic: true,
+  validate: (text) => /[a-z]/.test(text) && /[A-Z]/.test(text) && /\d/.test(text),
   generate: generators.secret,
 };
 

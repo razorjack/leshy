@@ -34,6 +34,24 @@ describe("structural detectors", () => {
     expect(r.output).toMatch(/^AWS_ACCESS_KEY_ID=AKIA[0-9A-Z]{16}$/);
   });
 
+  it("spans the secret path of a Slack or Discord webhook, keeps the host", async () => {
+    const doc =
+      "notify https://hooks.slack.com/services/T0000000000/B0000000000/XXXXXXXXXXXXXXXXXXXXXXXX and https://discord.com/api/webhooks/123456789012345678/abcDEF-ghiJKL_mnoPQR123456789";
+    const r = await scrub(doc, { config: resolveConfig() });
+    expect(r.output).toMatch(
+      /^notify https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9/]+ and https:\/\/discord\.com\/api\/webhooks\/[A-Za-z0-9/_-]+$/,
+    );
+    expect(r.output).not.toContain("B0000000000");
+    expect(r.output).not.toContain("123456789012345678");
+  });
+
+  it("catches an AWS secret access key but not a 40-char hex digest", () => {
+    expect(types("AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")).toContain(
+      "secret",
+    );
+    expect(types("commit 2fd4e1c67a2d28fced849ee1bb76e7391b93eb12")).not.toContain("secret");
+  });
+
   it("matches emails", () => {
     expect(types("contact: jan.kowalski+dev@sub.gmail.com")).toContain("email");
   });
