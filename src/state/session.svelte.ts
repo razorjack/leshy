@@ -61,7 +61,9 @@ class Session {
 
   /** Settings changes: re-scrub the current input immediately with new overrides. */
   setOverrides(overrides: ScrubOverrides): void {
-    this.overrides = overrides;
+    // Snapshot first: the settings dialog holds its lists in $state, and a
+    // proxy fails structured cloning the moment postMessage tries to send it.
+    this.overrides = $state.snapshot(overrides);
     if (this.input.trim() !== "") void this.run(this.input);
   }
 
