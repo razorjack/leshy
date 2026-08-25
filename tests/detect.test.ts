@@ -38,6 +38,14 @@ describe("detection without the model (structural + key-context)", () => {
   }
 });
 
+describe("key routing", () => {
+  it("routes email_address to the email detector, not to address", async () => {
+    const input = '{"email_address":"jan at gmail dot com"}';
+    const spans = await detect(input, { config });
+    expect(spans.map((s) => s.detector)).toEqual(["email"]);
+  });
+});
+
 describe("key-value scanning", () => {
   it("yields one pair per query parameter, the first included", () => {
     const kvs = scanKeyValues("GET https://x.io/u?token=abc123def456&api_key=zzz9 ok");

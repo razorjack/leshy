@@ -11,7 +11,7 @@ export const email: StructuralDetector = {
   enabled: true,
   match:
     /[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}/g,
-  keys: /^e?[-_]?mail$|_e?mail$/i,
+  keys: /^e?[-_]?mail(?:[-_]?address)?$|_e?mail$/i,
   // `scheme://user:pass@host` reads as the email `pass@host`. That span belongs
   // to url-credentials, which keeps the host readable; a plausibility check
   // only, so the tier stays structural.
