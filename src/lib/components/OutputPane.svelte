@@ -1,5 +1,6 @@
 <script lang="ts">
   import { session } from '../../state/session.svelte.ts'
+  import { clipboard } from '../../state/clipboard.svelte.ts'
   import type { Replacement } from '../../core/types.ts'
   import { splitOutput } from '../segments.ts'
   import TokenMark from './TokenMark.svelte'
@@ -31,20 +32,8 @@
   // when the marks have scrolled out of sight.
   let view = $state<'text' | 'table'>('text')
 
-  // The Clipboard API rejects when the permission is denied or the document is
-  // not focused; say so on the button rather than failing silently.
-  let copyState = $state<'idle' | 'copied' | 'failed'>('idle')
-  let copyTimer: ReturnType<typeof setTimeout> | undefined
-  const copy = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(session.output)
-      copyState = 'copied'
-    } catch {
-      copyState = 'failed'
-    }
-    clearTimeout(copyTimer)
-    copyTimer = setTimeout(() => (copyState = 'idle'), 1600)
-  }
+  const mod = navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl+'
+  const copy = (): void => void clipboard.copy(session.output)
 </script>
 
 <section class="flex min-h-0 flex-col bg-background">
@@ -92,8 +81,18 @@
         >
           Save
         </Button>
-        <Button variant="ghost" size="sm" class="-my-1 h-7 text-xs" onclick={copy}>
-          {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
+        <Button
+          variant="ghost"
+          size="sm"
+          class="-my-1 h-7 text-xs"
+          title="{mod}⇧C copies · {mod}⇧X copies and clears"
+          onclick={copy}
+        >
+          {clipboard.state === 'copied'
+            ? 'Copied'
+            : clipboard.state === 'failed'
+              ? 'Copy failed'
+              : 'Copy'}
         </Button>
       </div>
     {/if}

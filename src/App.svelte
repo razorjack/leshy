@@ -5,7 +5,10 @@
   import ThemeToggle from '$lib/components/ThemeToggle.svelte'
   import SettingsDialog from '$lib/components/SettingsDialog.svelte'
   import { session } from './state/session.svelte.ts'
+  import { onShortcut } from '$lib/shortcuts.ts'
 </script>
+
+<svelte:window onkeydown={onShortcut} />
 
 <div class="flex min-h-svh flex-col">
   <header class="flex items-center justify-between border-b border-border px-6 py-3">
