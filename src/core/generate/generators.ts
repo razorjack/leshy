@@ -1,3 +1,4 @@
+import type { Faker } from "@faker-js/faker";
 import type { Generate } from "../types.ts";
 import { fakerFor } from "./faker.ts";
 import { LOCALES, type Locale, locales } from "./locales.ts";
@@ -183,6 +184,15 @@ const API_PREFIXES = [
   "sk-",
 ];
 
+/** Same length, same character classes, same separators, none of the bytes. */
+const reshape = (f: Faker, src: string): string =>
+  Array.from(src, (ch) => {
+    if (/[0-9]/.test(ch)) return digit(f);
+    if (/[A-Z]/.test(ch)) return f.string.alpha({ length: 1, casing: "upper" });
+    if (/[a-z]/.test(ch)) return f.string.alpha({ length: 1, casing: "lower" });
+    return ch; // preserve separators like '_' and '-'
+  }).join("");
+
 const apiKey: Generate = (ctx) => {
   const f = fakerFor(ctx.seed, "en");
   const src = ctx.original;
@@ -190,14 +200,14 @@ const apiKey: Generate = (ctx) => {
   // material — key-context hits ('secret', 'token') have no prefix by
   // definition, and keeping their first characters leaks the real value.
   const prefix = API_PREFIXES.find((p) => src.startsWith(p)) ?? "";
-  const tail = Array.from(src.slice(prefix.length), (ch) => {
-    if (/[0-9]/.test(ch)) return digit(f);
-    if (/[A-Z]/.test(ch)) return f.string.alpha({ length: 1, casing: "upper" });
-    if (/[a-z]/.test(ch)) return f.string.alpha({ length: 1, casing: "lower" });
-    return ch; // preserve separators like '_' and '-'
-  }).join("");
-  return `${prefix}${tail}`;
+  return `${prefix}${reshape(f, src.slice(prefix.length))}`;
 };
+
+// Credential material has no realistic form to imitate and no reserved
+// namespace to draw from, so the fake keeps only the shape: a length or charset
+// bug still reproduces on the scrubbed text. Not idempotent across passes, same
+// as api-key and jwt — re-scrubbing reshapes a fake into another fake.
+const secret: Generate = (ctx) => reshape(fakerFor(ctx.seed, "en"), ctx.original);
 
 const uuid: Generate = (ctx) => fakerFor(ctx.seed, "en").string.uuid();
 
@@ -296,6 +306,7 @@ export const generators = {
   iban,
   jwt,
   "api-key": apiKey,
+  secret,
   uuid,
   person,
   address,

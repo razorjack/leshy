@@ -24,6 +24,7 @@ export type EntityType =
   | "iban"
   | "jwt"
   | "api-key"
+  | "secret"
   | "uuid"
   | "ssn"
   | "pesel"

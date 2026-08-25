@@ -7,6 +7,7 @@ import { creditCard } from "./creditCard.ts";
 import { iban } from "./iban.ts";
 import { jwt } from "./jwt.ts";
 import { apiKey } from "./apiKey.ts";
+import { authHeader, cookie, password, privateKey, sessionId, urlCredentials } from "./secret.ts";
 import { uuid } from "./uuid.ts";
 import { person } from "./person.ts";
 import { address, city, postcode, street } from "./address.ts";
@@ -21,6 +22,12 @@ export const builtins: Detector[] = [
   creditCard,
   iban,
   jwt,
+  password,
+  sessionId,
+  authHeader,
+  cookie,
+  urlCredentials,
+  privateKey,
   apiKey,
   email,
   mac,

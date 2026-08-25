@@ -4,6 +4,7 @@ import { resolveConfig } from "../src/core/config.ts";
 import { peselChecksum, isFakePesel } from "../src/core/packs/pl/pesel.ts";
 import { isSteuerId, steuerId } from "../src/core/packs/de/steuerId.ts";
 import { makeContext } from "../src/core/generate/context.ts";
+import { scrub } from "../src/core/engine.ts";
 
 const all = resolveConfig().detectors;
 
@@ -115,6 +116,73 @@ describe("de pack", () => {
     expect(types("Lieferung an Musterweg 5a")).toContain("address");
     expect(types("Karl-Marx-Allee 90, 10243 Berlin")).toContain("address");
     expect(types("the herring 5 was fine")).not.toContain("address");
+  });
+});
+
+describe("credential detectors", () => {
+  const scrubbed = async (input: string): Promise<string> =>
+    (await scrub(input, { config: resolveConfig() })).output;
+
+  it("catches passwords under any of the usual key names", async () => {
+    for (const key of ["password", "passwd", "pwd", "passphrase", "db_password", "userPassword"]) {
+      const out = await scrubbed(`{"${key}":"hunter2"}`);
+      expect(out, key).not.toContain("hunter2");
+      expect(out.startsWith(`{"${key}":"`)).toBe(true);
+    }
+  });
+
+  it("replaces the credential in an auth header, keeping name and scheme", async () => {
+    const out = await scrubbed("Authorization: Bearer 9f8a7b6c5d4e3f2a");
+    expect(out).not.toContain("9f8a7b6c5d4e3f2a");
+    expect(out.startsWith("Authorization: Bearer ")).toBe(true);
+    expect(await scrubbed('{"authorization":"Basic dXNlcjpwYXNz"}')).not.toContain("dXNlcjpwYXNz");
+  });
+
+  it("leaves prose that merely mentions a scheme alone", async () => {
+    const prose = "Basic authentication is required for this endpoint";
+    expect(await scrubbed(prose)).toBe(prose);
+  });
+
+  it("replaces cookie values but not cookie attributes", async () => {
+    const out = await scrubbed("Set-Cookie: sessionid=3f8a9b2c1d; Path=/; HttpOnly; SameSite=Lax");
+    expect(out).not.toContain("3f8a9b2c1d");
+    expect(out).toContain("; Path=/; HttpOnly; SameSite=Lax");
+  });
+
+  it("replaces URL userinfo, with or without a username", async () => {
+    expect(await scrubbed("redis://:mypass123@localhost:6379")).not.toContain("mypass123");
+    const pg = await scrubbed("postgres://appuser:tr0ub4dor@localhost:5432/app");
+    expect(pg).not.toContain("tr0ub4dor");
+    expect(pg).not.toContain("appuser");
+    expect(pg.endsWith("@localhost:5432/app")).toBe(true);
+  });
+
+  it("replaces a private key body line by line, keeping the PEM markers", async () => {
+    const pem = [
+      "-----BEGIN RSA PRIVATE KEY-----",
+      "MIIEowIBAAKCAQEAx4fk2Lm9QpR3vN8sT1uV",
+      "WxYz0123456789abcdefGHIJKLMNOPqrstu",
+      "-----END RSA PRIVATE KEY-----",
+    ].join("\n");
+    const out = await scrubbed(pem);
+    expect(out).not.toContain("MIIEowIBAAKCAQEAx4fk2Lm9QpR3vN8sT1uV");
+    expect(out.split("\n")).toHaveLength(4);
+    expect(out.startsWith("-----BEGIN RSA PRIVATE KEY-----")).toBe(true);
+    expect(out.endsWith("-----END RSA PRIVATE KEY-----")).toBe(true);
+  });
+
+  it("scrubs a session id but still preserves a database id", async () => {
+    const out = await scrubbed("session_id=aa11bb22 csrf=ZZ99 user_id=98123");
+    expect(out).not.toContain("aa11bb22");
+    expect(out).not.toContain("ZZ99");
+    expect(out).toContain("user_id=98123");
+  });
+
+  it("keeps the source shape so length and charset bugs still reproduce", async () => {
+    const out = await scrubbed('{"password":"Ab1-cd2"}');
+    const fake = out.slice('{"password":"'.length, -2);
+    expect(fake).toMatch(/^[A-Z][a-z]\d-[a-z]{2}\d$/);
+    expect(fake).not.toBe("Ab1-cd2");
   });
 });
 

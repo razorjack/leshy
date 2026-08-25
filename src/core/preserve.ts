@@ -26,8 +26,10 @@ const FAKE_MAC = /^[0-9A-Fa-f][26AEae]([:-])(?:[0-9A-Fa-f]{2}\1){4}[0-9A-Fa-f]{2
  */
 export const defaultPreserve: PreserveRule[] = [
   {
+    // A session or CSRF id is a credential, not a database key: the negative
+    // lookahead keeps `session_id` scrubbable while `user_id` stays readable.
     id: "db-ids",
-    keys: /(?:^|_)(?:id|uuid|guid)$/i,
+    keys: /^(?!.*(?:session|csrf|xsrf|auth|token|secret))(?:.*_)?(?:id|uuid|guid)$/i,
     enabled: true,
   },
   {

@@ -76,6 +76,18 @@ export const samples: Sample[] = [
       { text: "hans.mueller@beispiel.de", type: "email", expect: "catch" },
     ],
   },
+  {
+    name: "http-secrets",
+    input:
+      'POST /login upstream=postgres://appuser:tr0ub4dor@db.internal:5432/app authorization="Bearer 9f8a7b6c5d4e" cookie="sessionid=3f8a9b2c1d; theme=dark" password="hunter2" user_id=98123',
+    gold: [
+      { text: "tr0ub4dor", type: "secret", expect: "catch" },
+      { text: "9f8a7b6c5d4e", type: "secret", expect: "catch" },
+      { text: "3f8a9b2c1d", type: "secret", expect: "catch" },
+      { text: "hunter2", type: "secret", expect: "catch" },
+      { text: "user_id=98123", type: "db-id", expect: "preserve" },
+    ],
+  },
 ];
 
 /** PII where key names give no hint — only the semantic model catches these

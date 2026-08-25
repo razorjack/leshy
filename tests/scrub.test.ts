@@ -18,6 +18,8 @@ const golden: Record<string, string> = {
     "[ { name: 'Faith Casper', email: 'trevor@jagged-partridge.example', ssn: '812-00-0293' } ]",
   logfmt:
     '2024-01-02T10:00:00Z level=info user_email=elsa@torn-vibration.example user_id=98123 msg="login ok"',
+  "http-secrets":
+    'POST /login upstream=postgres://bzlsnuk:elizabeth@rare-heartbeat.example:5432/app authorization="Bearer 6h9r8t4f6t7i" cookie="sessionid=5d6n9e2p3b; theme=idwy" password="gyweoa4" user_id=98123',
   "de-json":
     '{"kunde":{"name":"Alessa Golomski","adresse":"Stüttekofener Str. 67a, 36781 Ost Jolina","steuer_id":"05197834327","email":"amya.corkery@nocturnal-digestive.example"}}',
 };
