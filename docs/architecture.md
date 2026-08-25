@@ -86,7 +86,8 @@ never block the UI thread. Two rules make the boundary sound:
 1. **Config is code and stays in the worker bundle.** `leshy.config.ts` may contain
    functions (validators, generators, custom matchers) — it is statically imported by
    `detect.worker.ts`, never serialised. The UI sends only `ScrubOverrides` (detector id
-   toggles, salt, model on/off) — plain data.
+   toggles, salt, model on/off, values to keep, and rules written in the settings dialog
+   whose regexes travel as source text and are compiled by `resolveConfig`) — plain data.
 2. **The protocol is tiny and typed** (`protocol.ts`): `warmup`, `scrub` in; `ready`,
    `progress`, `result`, `error` out, correlated by numeric id. No library — postMessage
    with a 60-line wrapper (`client.ts`).
