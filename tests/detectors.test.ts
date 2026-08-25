@@ -12,6 +12,12 @@ const types = (input: string, detectors = all): string[] =>
   [...new Set(detectStructural(input, detectors).map((s) => s.type))].sort();
 
 describe("structural detectors", () => {
+  it("redacts a prefixed API key even under an id-like key", async () => {
+    const r = await scrub("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE", { config: resolveConfig() });
+    expect(r.output).not.toContain("AKIAIOSFODNN7EXAMPLE");
+    expect(r.output).toMatch(/^AWS_ACCESS_KEY_ID=AKIA[0-9A-Z]{16}$/);
+  });
+
   it("matches emails", () => {
     expect(types("contact: jan.kowalski+dev@sub.gmail.com")).toContain("email");
   });
