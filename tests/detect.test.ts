@@ -38,6 +38,20 @@ describe("detection without the model (structural + key-context)", () => {
   }
 });
 
+describe("same-type overlap", () => {
+  it("keeps a validated extent instead of the union", async () => {
+    const input = '{"pesel":"44051401359 (old)"}';
+    const spans = await detect(input, { config });
+    expect(spans.map((s) => s.text)).toEqual(["44051401359"]);
+  });
+
+  it("unions an unvalidated structural hit with its key-context span", async () => {
+    const input = '{"email":"foo@bar.com/extra"}';
+    const spans = await detect(input, { config });
+    expect(spans.map((s) => s.text)).toEqual(["foo@bar.com/extra"]);
+  });
+});
+
 describe("key routing", () => {
   it("catches an X-Api-Key header and its logfmt form", async () => {
     const input = "X-Api-Key: 9f8a7b6c5d4e3f2a1b0c\nx-api-key=abcdef0123456789";

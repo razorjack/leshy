@@ -82,7 +82,8 @@ const take = (taken: Range[], r: Range): void => {
  *    fragments, and a partial replacement would leak the remainder.
  *
  * The merged span spans the union and keeps the identity of its highest-tier
- * constituent.
+ * constituent, unless that constituent is validated: a checksum proves the
+ * extent, so `"pesel": "44051401359 (old)"` keeps `(old)` outside the span.
  */
 const mergeAdjacent = (spans: Span[], input: string): Span[] => {
   const glue = /^[\s\d,/.·-]{0,6}$/;
@@ -103,7 +104,12 @@ const mergeAdjacent = (spans: Span[], input: string): Span[] => {
       prev.detector = winner.detector;
       prev.source = winner.source;
       prev.validated = winner.validated;
-      prev.end = Math.max(prev.end, s.end);
+      if (winner.validated) {
+        prev.start = winner.start;
+        prev.end = winner.end;
+      } else {
+        prev.end = Math.max(prev.end, s.end);
+      }
       prev.text = input.slice(prev.start, prev.end);
       prev.score = Math.max(prev.score, s.score);
     } else {
