@@ -1,20 +1,27 @@
 <script lang="ts">
-  import { Moon, Sun } from '@lucide/svelte'
-  import { currentTheme, toggleTheme, type Theme } from '../theme.ts'
+  import { Monitor, Moon, Sun } from '@lucide/svelte'
+  import { cycleTheme, themeSetting, type ThemeSetting } from '../theme.ts'
 
-  // initTheme() (main.ts) applied the class before mount, so this reads it back.
-  let theme = $state<Theme>(currentTheme())
+  // initTheme() (main.ts) ran before mount, so this reads the setting back.
+  // With three settings the icon shows the current one, not the next one.
+  let setting = $state<ThemeSetting>(themeSetting())
+  const label = $derived(
+    setting === 'system' ? 'Theme: follows the system' : `Theme: always ${setting}`,
+  )
 </script>
 
 <button
   type="button"
   class="rounded-md border border-border px-2.5 py-1 text-muted-foreground hover:text-foreground"
-  aria-label="Toggle theme"
-  onclick={() => (theme = toggleTheme())}
+  aria-label={label}
+  title={label}
+  onclick={() => (setting = cycleTheme())}
 >
-  {#if theme === 'dark'}
-    <Sun class="size-3.5" />
-  {:else}
+  {#if setting === 'system'}
+    <Monitor class="size-3.5" />
+  {:else if setting === 'dark'}
     <Moon class="size-3.5" />
+  {:else}
+    <Sun class="size-3.5" />
   {/if}
 </button>

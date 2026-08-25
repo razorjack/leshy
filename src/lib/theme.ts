@@ -1,4 +1,6 @@
 export type Theme = "light" | "dark";
+/** What the user picked. "system" is the absence of a choice: follow the OS. */
+export type ThemeSetting = Theme | "system";
 
 const KEY = "leshy-theme";
 // sRGB form of --background in app.css (oklch(0.165 0.018 165) and
@@ -6,31 +8,52 @@ const KEY = "leshy-theme";
 // The same two values appear in electron/main.ts and index.html.
 const THEME_COLOR: Record<Theme, string> = { dark: "#07110c", light: "#f7f6f0" };
 
+const darkQuery = (): MediaQueryList => window.matchMedia("(prefers-color-scheme: dark)");
+
 const metaTag = (): Element | null => document.querySelector('meta[name="theme-color"]');
 
-export const applyTheme = (theme: Theme): void => {
+const other = (theme: Theme): Theme => (theme === "dark" ? "light" : "dark");
+
+const applyTheme = (theme: Theme): void => {
   document.documentElement.classList.toggle("dark", theme === "dark");
   metaTag()?.setAttribute("content", THEME_COLOR[theme]);
 };
 
-export const currentTheme = (): Theme =>
-  document.documentElement.classList.contains("dark") ? "dark" : "light";
+const resolve = (setting: ThemeSetting): Theme =>
+  setting === "system" ? (darkQuery().matches ? "dark" : "light") : setting;
 
-/** localStorage override, else the OS preference. Call before first paint. */
-export const initTheme = (): void => {
+/** The stored choice, or "system" when there is none. */
+export const themeSetting = (): ThemeSetting => {
   const stored = localStorage.getItem(KEY);
-  const theme: Theme =
-    stored === "dark" || stored === "light"
-      ? stored
-      : window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
-  applyTheme(theme);
+  return stored === "dark" || stored === "light" ? stored : "system";
 };
 
-export const toggleTheme = (): Theme => {
-  const next: Theme = currentTheme() === "dark" ? "light" : "dark";
-  localStorage.setItem(KEY, next);
-  applyTheme(next);
+export const setTheme = (setting: ThemeSetting): void => {
+  if (setting === "system") localStorage.removeItem(KEY);
+  else localStorage.setItem(KEY, setting);
+  applyTheme(resolve(setting));
+};
+
+/**
+ * Cycles the three settings, always leaving the OS one click away. An explicit
+ * theme steps to "system" only once it agrees with what the OS asks for, so
+ * every click but that last one changes what you see.
+ */
+export const cycleTheme = (): ThemeSetting => {
+  const setting = themeSetting();
+  const system = resolve("system");
+  const next: ThemeSetting =
+    setting === "system" ? other(system) : setting === system ? "system" : other(setting);
+  setTheme(next);
   return next;
+};
+
+/** Call before first paint. */
+export const initTheme = (): void => {
+  applyTheme(resolve(themeSetting()));
+  // On "system" the OS preference can change while the app is open: a scheduled
+  // switch at sunset, or the Electron shell following the platform.
+  darkQuery().addEventListener("change", () => {
+    if (themeSetting() === "system") applyTheme(resolve("system"));
+  });
 };
