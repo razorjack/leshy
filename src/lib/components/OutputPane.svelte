@@ -5,6 +5,7 @@
   import TokenMark from './TokenMark.svelte'
   import ReplacementsTable from './ReplacementsTable.svelte'
   import { markClass } from '../marks.ts'
+  import { download, scrubbedName } from '../files.ts'
   import { Button } from './ui/button/index.ts'
   import * as Tooltip from './ui/tooltip/index.ts'
 
@@ -83,6 +84,14 @@
             </button>
           {/each}
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="-my-1 h-7 text-xs"
+          onclick={() => download(session.output, scrubbedName(session.fileName))}
+        >
+          Save
+        </Button>
         <Button variant="ghost" size="sm" class="-my-1 h-7 text-xs" onclick={copy}>
           {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
         </Button>

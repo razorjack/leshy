@@ -9,6 +9,14 @@
 
   let area = $state<HTMLTextAreaElement>()
   let mirror = $state<HTMLDivElement>()
+  let picker = $state<HTMLInputElement>()
+  let dragging = $state(false)
+
+  // A big log is a file, not a paste. Reading it here keeps it in the tab.
+  const openFiles = (files: FileList | null | undefined): void => {
+    const file = files?.[0]
+    if (file) void session.openFile(file)
+  }
 
   // Source ranges index the input they were computed from, so while an edit is
   // in flight the mirror shows the new text unmarked instead of smearing the
@@ -30,11 +38,45 @@
   })
 </script>
 
+<!-- Dropping anywhere on the page opens the file: the target is the app, not a box. -->
+<svelte:window
+  ondragover={(e) => {
+    e.preventDefault()
+    dragging = true
+  }}
+  ondragleave={(e) => {
+    if (e.relatedTarget === null) dragging = false
+  }}
+  ondrop={(e) => {
+    e.preventDefault()
+    dragging = false
+    openFiles(e.dataTransfer?.files)
+  }}
+/>
+
 <section class="flex min-h-0 flex-col bg-background">
-  <h2 class="px-6 pt-4 text-xs font-medium uppercase tracking-widest text-muted-foreground">
-    Paste anything
-  </h2>
-  <div class="relative flex min-h-0 flex-1 flex-col">
+  <div class="flex items-center justify-between gap-3 px-6 pt-4">
+    <h2 class="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+      {session.fileName ?? 'Paste anything'}
+    </h2>
+    <button
+      type="button"
+      class="-my-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+      onclick={() => picker?.click()}
+    >
+      Open file…
+    </button>
+    <input
+      bind:this={picker}
+      type="file"
+      class="hidden"
+      onchange={(e) => {
+        openFiles(e.currentTarget.files)
+        e.currentTarget.value = ''
+      }}
+    />
+  </div>
+  <div class="relative flex min-h-0 flex-1 flex-col {dragging ? 'ring-2 ring-inset ring-ring' : ''}">
     <!--
       The mirror: the same text in the same box one layer down, its own glyphs
       invisible, carrying the highlights a textarea cannot hold. Everything that

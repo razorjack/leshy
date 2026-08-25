@@ -28,6 +28,8 @@ class Session {
   warning = $state<string | undefined>(undefined);
   /** Values the user clicked to leave verbatim. Session-only, never stored. */
   kept = $state<string[]>([]);
+  /** Name of the file the input came from, when it was opened rather than pasted. */
+  fileName = $state<string | undefined>(undefined);
 
   private overrides: ScrubOverrides = {};
   private worker: ScrubWorker | undefined;
@@ -62,6 +64,7 @@ class Session {
       this.stage = "idle";
       this.error = undefined;
       this.warning = undefined;
+      this.fileName = undefined;
       return;
     }
     this.ensureWorker();
@@ -70,6 +73,13 @@ class Session {
     } else {
       this.timer = setTimeout(() => void this.run(value), DEBOUNCE_MS);
     }
+  }
+
+  /** A dropped or opened file: read in full, scrubbed immediately. */
+  async openFile(file: File): Promise<void> {
+    const text = await file.text();
+    this.fileName = file.name;
+    this.setInput(text, true);
   }
 
   /** Settings changes: re-scrub the current input immediately with new overrides. */
