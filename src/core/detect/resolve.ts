@@ -85,35 +85,40 @@ const take = (taken: Range[], r: Range): void => {
  * constituent, unless that constituent is validated: a checksum proves the
  * extent, so `"pesel": "44051401359 (old)"` keeps `(old)` outside the span.
  */
+const GLUE = /^[\s\d,/.·-]{0,6}$/;
+const FRAGMENTED = new Set(["address", "person", "org"]);
+
+const merge = (a: Span, b: Span, input: string): Span => {
+  const winner = spanTier(b) > spanTier(a) ? b : a;
+  const start = winner.validated ? winner.start : a.start;
+  const end = winner.validated ? winner.end : Math.max(a.end, b.end);
+  return {
+    start,
+    end,
+    text: input.slice(start, end),
+    type: a.type,
+    detector: winner.detector,
+    source: winner.source,
+    score: Math.max(a.score, b.score),
+    validated: winner.validated,
+  };
+};
+
 const mergeAdjacent = (spans: Span[], input: string): Span[] => {
-  const glue = /^[\s\d,/.·-]{0,6}$/;
-  const mergeable = new Set(["address", "person", "org"]);
-  const sorted = [...spans].sort((a, b) => a.start - b.start);
   const out: Span[] = [];
-  for (const s of sorted) {
+  for (const s of [...spans].sort((a, b) => a.start - b.start)) {
     const prev = out[out.length - 1];
     // sorted by start, so prev.start <= s.start: overlap reduces to this
     const overlapping = prev !== undefined && s.start < prev.end;
-    if (
+    const glued =
       prev !== undefined &&
-      prev.type === s.type &&
-      (overlapping ||
-        (mergeable.has(s.type) && s.start >= prev.end && glue.test(input.slice(prev.end, s.start))))
-    ) {
-      const winner = spanTier(s) > spanTier(prev) ? s : prev;
-      prev.detector = winner.detector;
-      prev.source = winner.source;
-      prev.validated = winner.validated;
-      if (winner.validated) {
-        prev.start = winner.start;
-        prev.end = winner.end;
-      } else {
-        prev.end = Math.max(prev.end, s.end);
-      }
-      prev.text = input.slice(prev.start, prev.end);
-      prev.score = Math.max(prev.score, s.score);
+      FRAGMENTED.has(s.type) &&
+      s.start >= prev.end &&
+      GLUE.test(input.slice(prev.end, s.start));
+    if (prev !== undefined && prev.type === s.type && (overlapping || glued)) {
+      out[out.length - 1] = merge(prev, s, input);
     } else {
-      out.push({ ...s });
+      out.push(s);
     }
   }
   return out;
