@@ -1,6 +1,7 @@
 <script lang="ts">
   import { session } from '../../state/session.svelte.ts'
   import { splitInput } from '../segments.ts'
+  import { markClass } from '../marks.ts'
 
   // A paste scrubs immediately; typing is debounced. `onpaste` fires before the
   // value updates, so flag it and let the following `oninput` run immediately.
@@ -48,7 +49,7 @@
       aria-hidden="true"
       class="pointer-events-none absolute inset-0 overflow-x-hidden overflow-y-scroll whitespace-pre-wrap break-words p-6 font-mono text-sm text-transparent"
       >{#each segments as seg}{#if seg.kind === 'text'}{seg.text}{:else}<mark
-            class="box-decoration-clone rounded-xs bg-mark text-transparent underline decoration-mark-border decoration-dotted underline-offset-2"
+            class="{markClass(seg.rep.type)} box-decoration-clone rounded-xs bg-mark text-transparent underline decoration-mark-border decoration-dotted underline-offset-2"
             >{seg.text}</mark
           >{/if}{/each}{'\n'}</div>
     <!--

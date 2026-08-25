@@ -52,9 +52,12 @@
   --input: oklch(0.87 0.015 110);
   --ring: oklch(0.55 0.1 158);
 
-  /* replaced-token highlight (moss tint) */
-  --mark: oklch(0.42 0.09 158 / 0.13);
-  --mark-border: oklch(0.42 0.09 158 / 0.45);
+  /* replaced-token highlight (moss tint); per-group hues override it below */
+  --mark-l: 0.42;
+  --mark-c: 0.09;
+  --mark-h: 158;
+  --mark: oklch(var(--mark-l) var(--mark-c) var(--mark-h) / 0.13);
+  --mark-border: oklch(var(--mark-l) var(--mark-c) var(--mark-h) / 0.45);
 
   --chart-1: oklch(0.42 0.09 158);
   --chart-2: oklch(0.62 0.08 125);
@@ -93,8 +96,11 @@
   --input: oklch(0.27 0.02 160);
   --ring: oklch(0.68 0.11 155);
 
-  --mark: oklch(0.68 0.11 155 / 0.16);
-  --mark-border: oklch(0.68 0.11 155 / 0.5);
+  --mark-l: 0.68;
+  --mark-c: 0.11;
+  --mark-h: 155;
+  --mark: oklch(var(--mark-l) var(--mark-c) var(--mark-h) / 0.16);
+  --mark-border: oklch(var(--mark-l) var(--mark-c) var(--mark-h) / 0.5);
 
   --chart-1: oklch(0.68 0.11 155);
   --chart-2: oklch(0.75 0.08 125);
@@ -157,6 +163,30 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* One hue per entity group (src/lib/marks.ts); lightness and chroma stay the
+   theme's, so every mark recedes the same amount and only the tint differs. */
+.mark-identity {
+  --mark-h: 158;
+}
+.mark-contact {
+  --mark-h: 235;
+}
+.mark-location {
+  --mark-h: 85;
+}
+.mark-network {
+  --mark-h: 195;
+}
+.mark-secret {
+  --mark-h: 25;
+}
+.mark-id {
+  --mark-h: 320;
+}
+.mark-other {
+  --mark-c: 0.02;
 }
 
 @layer base {

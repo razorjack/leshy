@@ -70,3 +70,7 @@ One line, used in the footer and empty state: **"Nothing leaves the woods."**
 - `assets/macos/Leshy.icon` keeps the editable Icon Composer source with effects disabled
   on the flattened mark. `npm run icons:macos` uses Xcode 26 to regenerate the committed
   `Assets.car` and fallback `Icon.icns`; normal desktop builds reuse those files.
+- Marks are tinted by entity group (identity, contact, location, network, secret, id) via
+  `.mark-*` classes that override only `--mark-h`; lightness, chroma and alpha stay the
+  theme's, so every mark recedes equally and only the hue says what kind of value it was.
+  The mapping lives in `src/lib/marks.ts`.

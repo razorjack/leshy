@@ -3,6 +3,7 @@
   import type { Replacement } from '../../core/types.ts'
   import { splitOutput } from '../segments.ts'
   import TokenMark from './TokenMark.svelte'
+  import { markClass } from '../marks.ts'
   import { Button } from './ui/button/index.ts'
   import * as Tooltip from './ui/tooltip/index.ts'
 
@@ -21,9 +22,7 @@
     return [...counts].sort(([a, na], [b, nb]) => nb - na || a.localeCompare(b))
   })
   const total = $derived(session.replacements.length)
-  const detail = $derived(
-    byType.length > 1 ? byType.map(([type, n]) => `${n} ${type}`).join(', ') : (byType[0]?.[0] ?? ''),
-  )
+  const detail = $derived(byType.map(([type, n]) => `${n} ${type}`).join(', '))
   const summary = $derived(total > 0 ? `${total} replaced: ${detail}` : 'Nothing replaced')
 
   // The Clipboard API rejects when the permission is denied or the document is
@@ -47,10 +46,15 @@
     <div class="flex min-w-0 items-baseline gap-3">
       <h2 class="text-xs font-medium uppercase tracking-widest text-muted-foreground">Scrubbed</h2>
       {#if hasOutput}
-        <p class="truncate text-xs text-muted-foreground" title={summary}>
+        <p class="flex min-w-0 items-center gap-2 truncate text-xs text-muted-foreground" title={summary}>
           {#if total > 0}
-            <span class="font-medium text-foreground">{total}</span>
-            replaced: {detail}
+            <span><span class="font-medium text-foreground">{total}</span> replaced</span>
+            {#each byType as [type, n] (type)}
+              <span class="{markClass(type)} inline-flex shrink-0 items-center gap-1">
+                <span class="size-2 rounded-full border border-mark-border bg-mark"></span>
+                {n} {type}
+              </span>
+            {/each}
           {:else}
             Nothing replaced
           {/if}
@@ -89,6 +93,7 @@
           >{#each segments as seg}{#if seg.kind === 'text'}{seg.text}{:else}<TokenMark
                 fake={seg.rep.fake}
                 label={seg.rep.label}
+                type={seg.rep.type}
                 original={original(seg.rep)}
                 onkeep={() => session.keep(original(seg.rep))}
               />{/if}{/each}</div>
