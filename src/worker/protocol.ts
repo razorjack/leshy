@@ -14,7 +14,7 @@ export type WorkerRequest =
   | { id: number; kind: "warmup" }
   | { id: number; kind: "scrub"; input: string; overrides?: ScrubOverrides };
 
-export type WorkerStage = "loading-model" | "detecting" | "generating";
+export type WorkerStage = "loading-model" | "detecting";
 
 export type WorkerResponse =
   | { id: number; kind: "ready" }
