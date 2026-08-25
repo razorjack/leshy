@@ -3,15 +3,15 @@ import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
 import mjsUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.mjs?url";
 import { Tokenizer } from "@huggingface/tokenizers";
 import userConfig from "../../leshy.config.ts";
-import type { LeshyConfig, Span } from "../core/types.ts";
-import { resolveConfig, type ResolvedConfig } from "../core/config.ts";
+import type { Span } from "../core/types.ts";
+import { resolveConfig } from "../core/config.ts";
 import { scrub } from "../core/engine.ts";
 import { detectSemantic } from "../core/detect/semantic/detect.ts";
 import { models } from "../core/detect/semantic/models.ts";
 import { Gliner } from "../core/detect/semantic/gliner/runtime.ts";
 import { glinerTokenizer } from "../core/detect/semantic/tokenizer.ts";
 import type { MakeTensor, OrtSession } from "../core/detect/semantic/gliner/types.ts";
-import type { ScrubOverrides, WorkerRequest, WorkerResponse, WorkerStage } from "./protocol.ts";
+import type { WorkerRequest, WorkerResponse, WorkerStage } from "./protocol.ts";
 
 // wasm + mjs are bundled same-origin via ?url (CSP connect-src 'self'); the
 // service worker precaches them. JSEP build → WebGPU with a wasm fallback.
@@ -62,23 +62,6 @@ const getGliner = (): Promise<Gliner> =>
     },
   ));
 
-/** Fold serialisable UI overrides over the code-defined config (adr/0006). */
-const configFor = (o: ScrubOverrides | undefined): ResolvedConfig => {
-  const merged: LeshyConfig = {
-    ...userConfig,
-    disable: [...(userConfig.disable ?? []), ...(o?.disable ?? [])],
-    enable: [...(userConfig.enable ?? []), ...(o?.enable ?? [])],
-    countries: o?.countries ?? userConfig.countries,
-    locale: o?.locale ?? userConfig.locale,
-    salt: o?.salt ?? userConfig.salt,
-    semantic: {
-      ...userConfig.semantic,
-      ...(o?.semanticEnabled === undefined ? {} : { enabled: o.semanticEnabled }),
-    },
-  };
-  return resolveConfig(merged);
-};
-
 type ScrubRequest = Extract<WorkerRequest, { kind: "scrub" }>;
 
 const post = (msg: WorkerResponse): void => self.postMessage(msg);
@@ -88,7 +71,7 @@ const fail = (id: number, e: unknown): void => post({ id, kind: "error", message
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 const runScrub = async (msg: ScrubRequest): Promise<void> => {
-  const config = configFor(msg.overrides);
+  const config = resolveConfig(userConfig, msg.overrides);
   let semantic: ((input: string) => Promise<Span[]>) | undefined;
   let warning: string | undefined;
   if (config.semantic.enabled) {

@@ -1,4 +1,5 @@
-import type { LocaleSetting, ScrubResult } from "../core/types.ts";
+import type { ScrubResult } from "../core/types.ts";
+import type { ConfigOverrides } from "../core/config.ts";
 
 /**
  * Worker boundary. Detection (model included) runs in the Web Worker; the UI
@@ -7,16 +8,7 @@ import type { LocaleSetting, ScrubResult } from "../core/types.ts";
  * the worker bundle — only serialisable overrides cross this boundary.
  */
 
-export interface ScrubOverrides {
-  /** Detector ids toggled from the UI, applied over leshy.config.ts. */
-  disable?: string[];
-  enable?: string[];
-  /** Country pack ids selected in the UI (adr/0008). */
-  countries?: string[];
-  locale?: LocaleSetting;
-  salt?: string;
-  semanticEnabled?: boolean;
-}
+export type ScrubOverrides = ConfigOverrides;
 
 export type WorkerRequest =
   | { id: number; kind: "warmup" }

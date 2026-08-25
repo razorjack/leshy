@@ -28,7 +28,39 @@ export interface ResolvedConfig {
   semantic: SemanticConfig;
 }
 
-export const resolveConfig = (config: LeshyConfig = {}): ResolvedConfig => {
+/**
+ * Serialisable adjustments a UI applies over the code-defined config. Only
+ * data crosses the worker boundary, so nothing here can carry a function.
+ */
+export interface ConfigOverrides {
+  /** Detector ids toggled, applied over `LeshyConfig.disable`/`enable`. */
+  disable?: string[];
+  enable?: string[];
+  /** Country pack ids selected (adr/0008). */
+  countries?: string[];
+  locale?: LocaleSetting;
+  salt?: string;
+  semanticEnabled?: boolean;
+}
+
+const applyOverrides = (config: LeshyConfig, o: ConfigOverrides): LeshyConfig => ({
+  ...config,
+  disable: [...(config.disable ?? []), ...(o.disable ?? [])],
+  enable: [...(config.enable ?? []), ...(o.enable ?? [])],
+  countries: o.countries ?? config.countries,
+  locale: o.locale ?? config.locale,
+  salt: o.salt ?? config.salt,
+  semantic: {
+    ...config.semantic,
+    ...(o.semanticEnabled === undefined ? {} : { enabled: o.semanticEnabled }),
+  },
+});
+
+export const resolveConfig = (
+  base: LeshyConfig = {},
+  overrides?: ConfigOverrides,
+): ResolvedConfig => {
+  const config = overrides ? applyOverrides(base, overrides) : base;
   const disabled = new Set(config.disable ?? []);
   const enabled = new Set(config.enable ?? []);
   const wanted = config.countries;
