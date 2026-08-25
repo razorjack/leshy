@@ -3,7 +3,7 @@ import type { Generate } from "../types.ts";
 import { fakerFor } from "./faker.ts";
 import { LOCALES, type Locale, locales } from "./locales.ts";
 import { nameTokens } from "./derive.ts";
-import { digit } from "./shape.ts";
+import { digit, mapDigitRuns, pad } from "./shape.ts";
 
 /**
  * Per-type fake generators (docs/adr/0002 table). Each is a pure function of its
@@ -220,6 +220,57 @@ const apiKey: Generate = (ctx) => {
 // as api-key and jwt — re-scrubbing reshapes a fake into another fake.
 const secret: Generate = (ctx) => reshape(fakerFor(ctx.seed, "en"), ctx.original);
 
+// Dates keep their layout and only the digit runs change: a four-digit run is
+// the year, the first two short runs are month and day and each stays within
+// 1..12, so the fake is a valid date whether the source was DD-MM or MM-DD.
+// Any later short run (a two-digit year, a time) gets a value of its own width.
+const dob: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  let short = 0;
+  return mapDigitRuns(ctx.original, (run) => {
+    if (run.length === 4) return String(f.number.int({ min: 1940, max: 2005 }));
+    if (run.length === 2 && short++ < 2) return pad(f.number.int({ min: 1, max: 12 }), 2);
+    return Array.from(run, () => digit(f)).join("");
+  });
+};
+
+// Each decimal keeps its sign and digit counts; the integer part stays in a
+// range that is a valid latitude and longitude either way.
+const geo: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  return ctx.original.replace(/\d+(?:\.\d+)?/g, (num) => {
+    const [int = "", frac] = num.split(".");
+    const whole =
+      int.length >= 3
+        ? String(f.number.int({ min: 100, max: 179 }))
+        : int.length === 2
+          ? String(f.number.int({ min: 10, max: 89 }))
+          : String(f.number.int({ min: 0, max: 9 }));
+    return frac === undefined ? whole : `${whole}.${Array.from(frac, () => digit(f)).join("")}`;
+  });
+};
+
+const cardCode: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  return mapDigitRuns(ctx.original, (run) => Array.from(run, () => digit(f)).join(""));
+};
+
+// MM/YY, MM/YYYY, YYYY-MM: the month run is the first two-digit run, the year
+// is the four-digit run or the remaining two-digit one, always in the future.
+const cardExpiry: Generate = (ctx) => {
+  const f = fakerFor(ctx.seed, "en");
+  let seenMonth = false;
+  return mapDigitRuns(ctx.original, (run) => {
+    if (run.length === 4) return String(f.number.int({ min: 2027, max: 2033 }));
+    if (run.length === 2 && !seenMonth) {
+      seenMonth = true;
+      return pad(f.number.int({ min: 1, max: 12 }), 2);
+    }
+    if (run.length === 2) return String(f.number.int({ min: 27, max: 33 }));
+    return Array.from(run, () => digit(f)).join("");
+  });
+};
+
 const uuid: Generate = (ctx) => fakerFor(ctx.seed, "en").string.uuid();
 
 /** Reproduce the source word's casing on a faked word. */
@@ -319,6 +370,10 @@ export const generators = {
   "api-key": apiKey,
   secret,
   uuid,
+  dob,
+  geo,
+  "card-code": cardCode,
+  "card-expiry": cardExpiry,
   person,
   address,
   street,

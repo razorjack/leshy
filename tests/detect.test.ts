@@ -80,6 +80,12 @@ describe("key routing", () => {
     ["password", "password"],
     ["pesel", "pesel"],
     ["ssn", "ssn"],
+    ["dob", "birth-date"],
+    ["birth_date", "birth-date"],
+    ["lat", "coordinates"],
+    ["longitude", "coordinates"],
+    ["cvv", "card-code"],
+    ["exp_date", "card-expiry"],
   ];
   for (const [key, detector] of routes) {
     it(`routes ${key} to ${detector}`, async () => {

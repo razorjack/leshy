@@ -102,6 +102,35 @@ describe("structured generators — determinism (fixed salt ⇒ exact strings)",
 });
 
 describe("shape-preserving digit generators", () => {
+  it("birth date keeps its layout and stays a valid date in either day-month order", async () => {
+    for (const src of ["1984-05-12", "12/05/1984", "05.12.84", "1984-05-12T00:00:00Z"]) {
+      const fake = await fakeOf("dob", src, "dob");
+      expect(fake.replace(/\d/g, "d")).toBe(src.replace(/\d/g, "d"));
+      const shorts = fake
+        .match(/\d+/g)!
+        .filter((run) => run.length === 2)
+        .slice(0, 2);
+      for (const run of shorts) expect(Number(run)).toBeGreaterThanOrEqual(1);
+      for (const run of shorts) expect(Number(run)).toBeLessThanOrEqual(12);
+    }
+  });
+
+  it("coordinates keep sign and precision and stay on the map", async () => {
+    const fake = await fakeOf("geo", "52.229676, -21.012229", "geo");
+    expect(fake).toMatch(/^\d{2}\.\d{6}, -\d{2}\.\d{6}$/);
+    expect(Number(fake.split(",")[0])).toBeLessThan(90);
+    expect(await fakeOf("geo", "-122.4194", "geo")).toMatch(/^-1[0-7]\d\.\d{4}$/);
+  });
+
+  it("card fields keep their layout", async () => {
+    expect(await fakeOf("card-code", "123", "card-code")).toMatch(/^\d{3}$/);
+    const expiry = await fakeOf("card-expiry", "05/27", "card-expiry");
+    expect(expiry).toMatch(/^(?:0[1-9]|1[0-2])\/(?:2[7-9]|3[0-3])$/);
+    expect(await fakeOf("card-expiry", "2027-05", "card-expiry")).toMatch(
+      /^20(?:2[7-9]|3[0-3])-(?:0[1-9]|1[0-2])$/,
+    );
+  });
+
   it("phone keeps +CC and the separator layout, replaces subscriber digits", async () => {
     const fake = await fakeOf("phone", "+48 601 234 567", "phone");
     expect(fake).toMatch(/^\+48 \d{3} \d{3} \d{3}$/);

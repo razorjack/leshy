@@ -20,6 +20,9 @@ import { uuid } from "./uuid.ts";
 import { person } from "./person.ts";
 import { address, city, postcode, street } from "./address.ts";
 import { org } from "./org.ts";
+import { birthDate } from "./birthDate.ts";
+import { coordinates } from "./coordinates.ts";
+import { cardCode, cardExpiry } from "./cardFields.ts";
 
 /**
  * Country-neutral detectors, always on. Anything that only makes sense inside
@@ -28,6 +31,8 @@ import { org } from "./org.ts";
  */
 export const builtins: Detector[] = [
   creditCard,
+  cardCode,
+  cardExpiry,
   iban,
   jwt,
   password,
@@ -50,4 +55,6 @@ export const builtins: Detector[] = [
   postcode,
   address,
   org,
+  birthDate,
+  coordinates,
 ];
