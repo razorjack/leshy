@@ -21,6 +21,9 @@ const hash32 = (str: string): number => {
   return h >>> 0;
 };
 
+/** Seeds already derived in this run, keyed by scope + identity. */
+export type SeedCache = Map<string, number>;
+
 /**
  * Builds the per-span derivation context. `personSeed` is span-independent
  * (keyed only on salt + token sequence) so a person name and an email local
@@ -30,6 +33,9 @@ const hash32 = (str: string): number => {
  * (adr/0002): the engine bumps it until the fake is free. It changes personSeed
  * too, so even person/email fakes make progress — at the cost of breaking their
  * linkage for that one colliding value (an accepted collision consequence).
+ *
+ * `cache` skips the SHA-256 round trip for a value already seen in the run: a
+ * log repeats the same IP thousands of times, and the seed is the same each time.
  */
 export const makeContext = async (
   original: string,
@@ -37,10 +43,17 @@ export const makeContext = async (
   salt: string,
   locale: LocaleSetting = "auto",
   retry = 0,
+  cache?: SeedCache,
 ): Promise<GenerateContext> => {
   const normalized = normalise(original, type);
   const tag = retry > 0 ? `:retry:${retry}` : "";
-  const seed = await deriveSeed(salt, `${type}${tag}`, normalized);
+  const scope = `${type}${tag}`;
+  const key = `${scope}\0${normalized}`;
+  let seed = cache?.get(key);
+  if (seed === undefined) {
+    seed = await deriveSeed(salt, scope, normalized);
+    cache?.set(key, seed);
+  }
   return {
     original,
     normalized,
