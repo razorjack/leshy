@@ -9,6 +9,20 @@
   const segments = $derived(splitOutput(session.output, session.replacements))
   const hasOutput = $derived(session.output.length > 0)
 
+  // A tally by entity type. On a long paste the marks scroll out of sight, so
+  // this is the only place that says how much was replaced, and the quickest
+  // way to notice a detector that over-fired.
+  const byType = $derived.by(() => {
+    const counts = new Map<string, number>()
+    for (const rep of session.replacements) counts.set(rep.type, (counts.get(rep.type) ?? 0) + 1)
+    return [...counts].sort(([a, na], [b, nb]) => nb - na || a.localeCompare(b))
+  })
+  const total = $derived(session.replacements.length)
+  const detail = $derived(
+    byType.length > 1 ? byType.map(([type, n]) => `${n} ${type}`).join(', ') : (byType[0]?.[0] ?? ''),
+  )
+  const summary = $derived(total > 0 ? `${total} replaced: ${detail}` : 'Nothing replaced')
+
   // The Clipboard API rejects when the permission is denied or the document is
   // not focused; say so on the button rather than failing silently.
   let copyState = $state<'idle' | 'copied' | 'failed'>('idle')
@@ -26,8 +40,20 @@
 </script>
 
 <section class="flex min-h-0 flex-col bg-background">
-  <div class="flex items-center justify-between px-6 pt-4">
-    <h2 class="text-xs font-medium uppercase tracking-widest text-muted-foreground">Scrubbed</h2>
+  <div class="flex items-center justify-between gap-3 px-6 pt-4">
+    <div class="flex min-w-0 items-baseline gap-3">
+      <h2 class="text-xs font-medium uppercase tracking-widest text-muted-foreground">Scrubbed</h2>
+      {#if hasOutput}
+        <p class="truncate text-xs text-muted-foreground" title={summary}>
+          {#if total > 0}
+            <span class="font-medium text-foreground">{total}</span>
+            replaced: {detail}
+          {:else}
+            Nothing replaced
+          {/if}
+        </p>
+      {/if}
+    </div>
     {#if hasOutput}
       <Button variant="ghost" size="sm" class="-my-1 h-7 text-xs" onclick={copy}>
         {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
