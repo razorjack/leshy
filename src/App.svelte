@@ -31,6 +31,8 @@
       <span>Scanning…</span>
     {:else if session.stage === 'error'}
       <span class="text-destructive">{session.error}</span>
+    {:else if session.warning}
+      <span class="text-destructive">{session.warning}</span>
     {/if}
   </footer>
 </div>

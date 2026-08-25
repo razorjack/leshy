@@ -83,21 +83,30 @@ type ScrubRequest = Extract<WorkerRequest, { kind: "scrub" }>;
 
 const post = (msg: WorkerResponse): void => self.postMessage(msg);
 const progress = (id: number, stage: WorkerStage): void => post({ id, kind: "progress", stage });
-const fail = (id: number, e: unknown): void =>
-  post({ id, kind: "error", message: e instanceof Error ? e.message : String(e) });
+const fail = (id: number, e: unknown): void => post({ id, kind: "error", message: message(e) });
+
+const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 const runScrub = async (msg: ScrubRequest): Promise<void> => {
   const config = configFor(msg.overrides);
   let semantic: ((input: string) => Promise<Span[]>) | undefined;
+  let warning: string | undefined;
   if (config.semantic.enabled) {
     if (!glinerReady) progress(msg.id, "loading-model");
-    const gliner = await getGliner();
-    semantic = (input) =>
-      detectSemantic(input, config.detectors, gliner, config.semantic.threshold);
+    try {
+      const gliner = await getGliner();
+      semantic = (input) =>
+        detectSemantic(input, config.detectors, gliner, config.semantic.threshold);
+    } catch (e: unknown) {
+      // Recall first: the rule-based layers still catch most of the fixture
+      // set, so a failed download (offline first launch, dropped connection)
+      // degrades detection instead of disabling it.
+      warning = `Model unavailable, names and addresses were not scanned (${message(e)})`;
+    }
   }
   progress(msg.id, "detecting");
   const result = await scrub(msg.input, { config, semantic });
-  post({ id: msg.id, kind: "result", result });
+  post({ id: msg.id, kind: "result", result, ...(warning === undefined ? {} : { warning }) });
 };
 
 // The ONNX session is not reentrant, so scrubs run one at a time. While one is

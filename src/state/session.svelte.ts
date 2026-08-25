@@ -24,6 +24,8 @@ class Session {
   scrubbedFrom = $state("");
   stage = $state<SessionStage>("idle");
   error = $state<string | undefined>(undefined);
+  /** The last result was produced without the model (it failed to load). */
+  warning = $state<string | undefined>(undefined);
 
   private overrides: ScrubOverrides = {};
   private worker: ScrubWorker | undefined;
@@ -55,6 +57,7 @@ class Session {
       this.scrubbedFrom = "";
       this.stage = "idle";
       this.error = undefined;
+      this.warning = undefined;
       return;
     }
     this.ensureWorker();
@@ -85,6 +88,7 @@ class Session {
       this.output = result.output;
       this.replacements = result.replacements;
       this.scrubbedFrom = value;
+      this.warning = result.warning;
       this.stage = "done";
     } catch (e) {
       if (token !== this.token) return; // superseded — its rejection is expected

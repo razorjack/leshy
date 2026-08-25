@@ -1,6 +1,11 @@
 import type { ScrubResult } from "../core/types.ts";
 import type { ScrubOverrides, WorkerRequest, WorkerResponse, WorkerStage } from "./protocol.ts";
 
+export interface ScrubOutcome extends ScrubResult {
+  /** Set when detection ran without the model. */
+  warning?: string;
+}
+
 /** Typed RPC over postMessage — the platform needs no library for this. */
 export class ScrubWorker {
   private readonly worker: Worker;
@@ -8,7 +13,7 @@ export class ScrubWorker {
   private lastScrubId: number | undefined;
   private readonly pending = new Map<
     number,
-    { resolve: (r: ScrubResult) => void; reject: (e: Error) => void }
+    { resolve: (r: ScrubOutcome) => void; reject: (e: Error) => void }
   >();
 
   onStage: ((stage: WorkerStage) => void) | undefined;
@@ -25,7 +30,9 @@ export class ScrubWorker {
       if (!entry) return;
       if (msg.kind === "result") {
         this.pending.delete(msg.id);
-        entry.resolve(msg.result);
+        entry.resolve(
+          msg.warning === undefined ? msg.result : { ...msg.result, warning: msg.warning },
+        );
       } else if (msg.kind === "error") {
         this.pending.delete(msg.id);
         entry.reject(new Error(msg.message));
@@ -51,7 +58,7 @@ export class ScrubWorker {
     prev?.reject(new Error("superseded"));
   }
 
-  scrub(input: string, overrides?: ScrubOverrides): Promise<ScrubResult> {
+  scrub(input: string, overrides?: ScrubOverrides): Promise<ScrubOutcome> {
     this.cancel();
     const id = this.nextId++;
     this.lastScrubId = id;

@@ -27,5 +27,6 @@ export type WorkerStage = "loading-model" | "detecting" | "generating";
 export type WorkerResponse =
   | { id: number; kind: "ready" }
   | { id: number; kind: "progress"; stage: WorkerStage }
-  | { id: number; kind: "result"; result: ScrubResult }
+  /** `warning` is set when the model could not load and only the rule-based layers ran. */
+  | { id: number; kind: "result"; result: ScrubResult; warning?: string }
   | { id: number; kind: "error"; message: string };
