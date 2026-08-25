@@ -55,6 +55,33 @@ describe("config overrides", () => {
     expect(r.output).not.toContain("jan.kowalski@gmail.com");
   });
 
+  it("a rule written in the UI runs as a structural or key detector", async () => {
+    const config = resolveConfig(
+      {},
+      {
+        rules: [
+          { id: "r1", label: "Ticket", pattern: "\\bTKT-\\d{6}\\b", type: "secret", enabled: true },
+          { id: "r2", label: "Badge", keys: "^badge_no$", type: "secret", enabled: true },
+          { id: "r3", label: "Off", pattern: "\\bOFF-\\d+\\b", type: "secret", enabled: false },
+        ],
+      },
+    );
+    const r = await scrub("TKT-123456 badge_no=A77 OFF-1", { config });
+    expect(r.output).toMatch(/^[A-Z]{3}-\d{6} badge_no=[A-Z]\d{2} OFF-1$/);
+    expect(r.output).not.toBe("TKT-123456 badge_no=A77 OFF-1");
+    expect(r.replacements.map((x) => x.label)).toEqual(["Ticket", "Badge"]);
+  });
+
+  it("a keep rule written in the UI spares values under its keys", async () => {
+    const config = resolveConfig(
+      {},
+      { keepRules: [{ id: "k1", label: "Support mailbox", keys: "^support$", enabled: true }] },
+    );
+    const r = await scrub("support=help@corp.io from=jan@corp.io", { config });
+    expect(r.output).toContain("help@corp.io");
+    expect(r.output).not.toContain("jan@corp.io");
+  });
+
   it("enabling an off-by-default detector activates it (uuid)", async () => {
     const withUuid = await scrub("id 123e4567-e89b-42d3-a456-426614174000", {
       config: resolveConfig({ enable: ["uuid"] }),
