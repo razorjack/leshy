@@ -90,7 +90,7 @@ const lockDown = (): void => {
 };
 
 // Matches --background in src/app.css so the window does not flash before paint.
-const background = (): string => (nativeTheme.shouldUseDarkColors ? "#07110c" : "#f9f6f0");
+const background = (): string => (nativeTheme.shouldUseDarkColors ? "#07110c" : "#f7f6f0");
 
 const createWindow = (): BrowserWindow => {
   const win = new BrowserWindow({

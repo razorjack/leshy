@@ -1,9 +1,10 @@
 export type Theme = "light" | "dark";
 
 const KEY = "leshy-theme";
-// Match the app.css --background of each theme so the mobile browser chrome
-// blends with the page.
-const THEME_COLOR: Record<Theme, string> = { dark: "#101b15", light: "#f6f5ef" };
+// sRGB form of --background in app.css (oklch(0.165 0.018 165) and
+// oklch(0.972 0.008 95)), so the mobile browser chrome blends with the page.
+// The same two values appear in electron/main.ts and index.html.
+const THEME_COLOR: Record<Theme, string> = { dark: "#07110c", light: "#f7f6f0" };
 
 const metaTag = (): Element | null => document.querySelector('meta[name="theme-color"]');
 
