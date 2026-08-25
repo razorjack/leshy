@@ -1,6 +1,7 @@
 import type { PreserveRule } from "./types.ts";
 
-const TIMESTAMP =
+/** Shared with resolve(), which drops pure-timestamp spans the model returns. */
+export const TIMESTAMP =
   /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|\s?[+-]\d{2}:?\d{2})?)?$/;
 
 // RFC 5737 TEST-NET ranges — Leshy's fake namespace for public IPv4s.

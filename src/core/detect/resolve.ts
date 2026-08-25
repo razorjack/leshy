@@ -1,15 +1,13 @@
 import type { Detector, PreserveRule, Span } from "../types.ts";
 import { TIER } from "../types.ts";
 import { scanKeyValues, type KeyValue } from "./keyContext.ts";
+import { TIMESTAMP } from "../preserve.ts";
 
 const SOURCE_TIER = {
   structural: TIER.STRUCTURAL,
   "key-context": TIER.KEY_CONTEXT,
   semantic: TIER.SEMANTIC,
 } as const;
-
-const TIMESTAMP_SHAPE =
-  /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|\s?[+-]\d{2}:?\d{2})?)?$/;
 
 export const spanTier = (s: Span): number => (s.validated ? TIER.VALIDATED : SOURCE_TIER[s.source]);
 
@@ -162,7 +160,7 @@ export const resolve = (
   let semantic = rawSpans.filter((s) => s.source === "semantic");
   semantic = semantic.filter((s) => {
     // pure timestamps and bare numbers are never PII by themselves
-    if (TIMESTAMP_SHAPE.test(s.text) || /^\d+$/.test(s.text)) return false;
+    if (TIMESTAMP.test(s.text) || /^\d+$/.test(s.text)) return false;
     // a span in key position (right before : | => | =) names a field, not a value
     if (/^["']?\s*(?::|=>|=)/.test(input.slice(s.end, s.end + 5))) return false;
     if (corroborated.has(s.type)) return hits(structuralRegions, s);
