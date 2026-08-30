@@ -125,9 +125,17 @@ says otherwise.
 
 ## Code conventions
 
-- Names: as short as possible while unambiguous — `detectByKey` not
-  `detectEntitiesByKeyContext`; `spanTier` not `getSpanPrecedenceTier`; `kvs` is fine for
-  a local, `keyValues` for an export.
+- **Readability is binding.** Good code looks settled and obvious. If a reader must pause
+  to expand an expression, track several meanings through one statement, or decode a
+  compressed name, reshape the code. Prefer a few calm, explicit lines over a clever one.
+- **Names carry meaning.** Prefer concise names, never merely short ones. `detectByKey`
+  and `spanTier` are precise; `detectEntitiesByKeyContext` and `getSpanPrecedenceTier`
+  add no meaning. One-letter names are only for conventional indices or a mathematical
+  formula whose complete scope is a few lines. Name collection items after the domain
+  value (`detector`, `span`, `replacement`, `keyValue`), not `d`, `s`, `r`, or `kv`.
+  Outside tiny scopes, use the exact domain name even when it is longer: `context`,
+  `keyValues`, `preserveRules`, `sourceStart`. Avoid `data`, `value`, `item`, `ctx`,
+  `result`, and similar generic names when the value has a stable, more specific name.
 - Comments explain non-obvious _why_ only (a checksum's century bands, a lint
   workaround). Never _what_, never restating the code. Doc-comments on exported
   contracts are the exception and should earn their lines.
@@ -136,6 +144,68 @@ says otherwise.
   exports except Svelte components and config files.
 - Tests: pure logic gets unit tests + gold fixtures; UI behaviour is verified manually
   per plan step (one optional Playwright smoke test at step 17).
+
+### Function bodies (binding)
+
+- A function operates at one level of abstraction. An engine entry point coordinates
+  detection, resolution, generation, and splicing; it does not implement those operations
+  inline. A worker handler coordinates model readiness, progress, and a core call; it does
+  not mix model setup, queue policy, message formatting, and detection details.
+- An orchestration function reads as a short sequence of domain operations. Its control
+  flow must be understandable without opening the functions it calls.
+- Keep each statement simple. Prefer guard clauses, ordinary `if` statements, and named
+  intermediate values. Avoid nested ternaries, conditional object spreads, nested
+  callbacks, and expressions that combine branching, mutation, formatting, and I/O.
+- Keep pure calculation separate from browser, worker, clipboard, Electron, filesystem,
+  and model-loading I/O. Parse and validate at the boundary, then pass valid domain values
+  through `src/core`.
+- Keep callbacks to one expression or a few obvious lines. Extract a longer callback when
+  the extracted function names a real operation.
+- Extract by responsibility, not by line count. Do not create `handleThing`,
+  `processData`, `step1`, or trivial forwarding helpers to satisfy a metric. Keep a helper
+  in the same file until reuse or a real module boundary justifies moving it.
+- A new function that would take more than four independent arguments uses an options
+  object named for the operation. Do not hide a coherent domain object behind a bag of
+  unrelated optional fields.
+- Production functions normally stay below 50 lines and cyclomatic complexity 15. A
+  linear parser, span algorithm, or numerical model routine may exceed these limits when
+  splitting it would obscure the algorithm. Keep the exception local and document why the
+  linear form is clearer.
+- Modern syntax is welcome when it reduces cognitive load. An explicit statement is
+  better than a compact expression that a reader must decode.
+- Before finishing a change, read every changed function body from top to bottom. Simplify
+  any line that performs several conceptual operations or requires mental expansion.
+
+### Canonical pipeline shape
+
+This is the target style for an engine pipeline, worker job, state transition, or other
+workflow. The exact operations will change; the shape should remain recognizable.
+
+```ts
+export const detect = async (input: string, context: EngineContext): Promise<Span[]> => {
+  const keyValues = scanKeyValues(input);
+  const detectors = context.config.detectors;
+
+  const structuralSpans = detectStructural(input, detectors);
+  const keySpans = detectByKey(input, detectors, keyValues);
+  const semanticSpans = context.semantic ? await context.semantic(input) : [];
+  const detectedSpans = [...structuralSpans, ...keySpans, ...semanticSpans];
+
+  return resolve(
+    detectedSpans,
+    input,
+    detectors,
+    context.config.preserve,
+    keyValues,
+    context.config.keep,
+  );
+};
+```
+
+This function reads in execution order. Each statement performs one domain operation.
+Names identify the contents rather than their container type. Blank lines separate setup,
+detection, and resolution. Detection details remain in focused functions, so a reader can
+understand the pipeline here and inspect each operation independently.
 
 ## Where answers live
 
