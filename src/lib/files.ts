@@ -8,9 +8,9 @@ export const scrubbedName = (name: string | undefined): string => {
 /** Hands the text to the browser as a download; nothing leaves the tab. */
 export const download = (text: string, name: string): void => {
   const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
   URL.revokeObjectURL(url);
 };

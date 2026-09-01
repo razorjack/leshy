@@ -20,8 +20,8 @@ const gen = { ...generators, pesel: pesel.generate, ssn: ssn.generate };
 type GenKey = keyof typeof gen;
 
 const fakeOf = async (key: GenKey, original: string, type: EntityType): Promise<string> => {
-  const ctx = await makeContext(original, type, SALT);
-  return gen[key](ctx);
+  const context = await makeContext({ original, type, salt: SALT });
+  return gen[key](context);
 };
 
 const fakeIn = async (
@@ -29,7 +29,7 @@ const fakeIn = async (
   original: string,
   type: EntityType,
   locale: LocaleSetting,
-): Promise<string> => gen[key](await makeContext(original, type, SALT, locale));
+): Promise<string> => gen[key](await makeContext({ original, type, salt: SALT, locale }));
 
 const spanCount = async (text: string): Promise<number> => (await detect(text, { config })).length;
 

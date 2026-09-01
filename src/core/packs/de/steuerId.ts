@@ -21,13 +21,13 @@ const checkDigit = (ten: string): number => {
  */
 const digitsOk = (ten: string): boolean => {
   const counts = new Map<string, number>();
-  for (const c of ten) counts.set(c, (counts.get(c) ?? 0) + 1);
-  const repeated = [...counts.entries()].filter(([, n]) => n > 1);
+  for (const digit of ten) counts.set(digit, (counts.get(digit) ?? 0) + 1);
+  const repeated = [...counts.entries()].filter(([, count]) => count > 1);
   const entry = repeated[0];
   if (repeated.length !== 1 || entry === undefined) return false;
-  const [d, n] = entry;
-  if (n === 2) return true;
-  return n === 3 && !ten.includes(d.repeat(3));
+  const [digit, count] = entry;
+  if (count === 2) return true;
+  return count === 3 && !ten.includes(digit.repeat(3));
 };
 
 export const isSteuerId = (digits: string): boolean =>
@@ -42,13 +42,14 @@ export const isSteuerId = (digits: string): boolean =>
  * preserve rule. Digits 3-4 are held at 13–19, which is not a month in any
  * PESEL century band, so a fake can never read as a valid Polish id either.
  */
-const generate: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  const month = f.number.int({ min: 3, max: 9 });
-  const pool = f.helpers.shuffle([2, 3, 4, 5, 6, 7, 8, 9].filter((d) => d !== month)).slice(0, 6);
-  const rest = f.helpers.shuffle([...pool, f.helpers.arrayElement(pool)]);
-  const ten = `0${rest[0]}1${month}${rest.slice(1).join("")}`;
-  return `${ten}${checkDigit(ten)}`;
+const generate: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  const month = faker.number.int({ min: 3, max: 9 });
+  const availableDigits = [2, 3, 4, 5, 6, 7, 8, 9].filter((digit) => digit !== month);
+  const pool = faker.helpers.shuffle(availableDigits).slice(0, 6);
+  const remainingDigits = faker.helpers.shuffle([...pool, faker.helpers.arrayElement(pool)]);
+  const firstTenDigits = `0${remainingDigits[0]}1${month}${remainingDigits.slice(1).join("")}`;
+  return `${firstTenDigits}${checkDigit(firstTenDigits)}`;
 };
 
 export const steuerId: StructuralDetector = {

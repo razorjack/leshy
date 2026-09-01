@@ -16,21 +16,69 @@ export interface EngineContext {
  * precedence into non-overlapping spans. Fully implemented and validated by
  * scripts/spike against docs/spike-samples (22/22 catches, 0 preserve hits).
  */
-export const detect = async (input: string, ctx: EngineContext): Promise<Span[]> => {
-  const kvs = scanKeyValues(input);
-  const detectors = ctx.config.detectors;
-  const raw = [
-    ...detectStructural(input, detectors),
-    ...detectByKey(input, detectors, kvs),
-    ...(ctx.semantic ? await ctx.semantic(input) : []),
-  ];
-  return resolve(raw, input, detectors, ctx.config.preserve, kvs, ctx.config.keep);
+export const detect = async (input: string, context: EngineContext): Promise<Span[]> => {
+  const keyValues = scanKeyValues(input);
+  const detectors = context.config.detectors;
+
+  const structuralSpans = detectStructural(input, detectors);
+  const keySpans = detectByKey(input, detectors, keyValues);
+  const semanticSpans = context.semantic ? await context.semantic(input) : [];
+  const detectedSpans = [...structuralSpans, ...keySpans, ...semanticSpans];
+
+  return resolve(
+    detectedSpans,
+    input,
+    detectors,
+    context.config.preserve,
+    keyValues,
+    context.config.keep,
+  );
 };
 
 // Generator output may never contain these — they would corrupt the surrounding
 // JSON/Ruby/log structure the user copies out (adr/0002). Violations reseed.
 const FORBIDDEN = /["'\\\n\r]/;
 const MAX_RETRIES = 8;
+
+interface GenerateFakeOptions {
+  span: Span;
+  detector: Detector;
+  context: EngineContext;
+  fakeOwners: Map<string, string>;
+  seedCache: SeedCache;
+}
+
+const generateFake = async ({
+  span,
+  detector,
+  context,
+  fakeOwners,
+  seedCache,
+}: GenerateFakeOptions): Promise<string> => {
+  let fake = "";
+  let normalized = "";
+
+  for (let retry = 0; retry <= MAX_RETRIES; retry++) {
+    const generateContext = await makeContext({
+      original: span.text,
+      type: span.type,
+      salt: context.config.salt,
+      locale: context.config.locale,
+      retry,
+      cache: seedCache,
+    });
+    fake = detector.generate(generateContext);
+    normalized = generateContext.normalized;
+
+    const owner = fakeOwners.get(fake);
+    const available = owner === undefined || owner === normalized;
+    const valid = fake !== span.text && !FORBIDDEN.test(fake);
+    if (available && valid) break;
+  }
+
+  fakeOwners.set(fake, normalized);
+  return fake;
+};
 
 /**
  * Detect → derive → generate → splice. Fakes are spliced left-to-right; bytes
@@ -40,37 +88,24 @@ const MAX_RETRIES = 8;
  * violation). Idempotence per adr/0002: structured types via fake-namespace
  * preserve rules; person/address/org within a run.
  */
-export const scrub = async (input: string, ctx: EngineContext): Promise<ScrubResult> => {
-  const spans = await detect(input, ctx);
-  const salt = ctx.config.salt;
-  const byId = new Map<string, Detector>(ctx.config.detectors.map((d) => [d.id, d]));
-  const used = new Map<string, string>(); // fake → normalised source that owns it
-  const seeds: SeedCache = new Map();
+export const scrub = async (input: string, context: EngineContext): Promise<ScrubResult> => {
+  const spans = await detect(input, context);
+  const detectorsById = new Map(
+    context.config.detectors.map((detector) => [detector.id, detector]),
+  );
+  const fakeOwners = new Map<string, string>();
+  const seedCache: SeedCache = new Map();
 
   const replacements: Replacement[] = [];
   let output = "";
-  let cursor = 0;
+  let sourceCursor = 0;
 
   for (const span of spans) {
-    const detector = byId.get(span.detector);
+    const detector = detectorsById.get(span.detector);
     if (!detector) continue;
 
-    let gctx = await makeContext(span.text, span.type, salt, ctx.config.locale, 0, seeds);
-    const normalized = gctx.normalized;
-    let fake = detector.generate(gctx);
-    const free = (f: string): boolean => {
-      const owner = used.get(f);
-      // A fake equal to its source is a leak, not a substitution: reseed.
-      if (f === span.text || FORBIDDEN.test(f)) return false;
-      return owner === undefined || owner === normalized;
-    };
-    for (let retry = 1; retry <= MAX_RETRIES && !free(fake); retry++) {
-      gctx = await makeContext(span.text, span.type, salt, ctx.config.locale, retry, seeds);
-      fake = detector.generate(gctx);
-    }
-    used.set(fake, normalized);
-
-    output += input.slice(cursor, span.start);
+    const fake = await generateFake({ span, detector, context, fakeOwners, seedCache });
+    output += input.slice(sourceCursor, span.start);
     const start = output.length;
     output += fake;
     replacements.push({
@@ -83,8 +118,9 @@ export const scrub = async (input: string, ctx: EngineContext): Promise<ScrubRes
       detector: span.detector,
       label: detector.label,
     });
-    cursor = span.end;
+    sourceCursor = span.end;
   }
-  output += input.slice(cursor);
+
+  output += input.slice(sourceCursor);
   return { output, replacements };
 };

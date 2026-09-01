@@ -36,6 +36,18 @@ class Session {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private token = 0;
 
+  private clear(): void {
+    this.token++;
+    this.worker?.cancel();
+    this.output = "";
+    this.replacements = [];
+    this.scrubbedFrom = "";
+    this.stage = "idle";
+    this.error = undefined;
+    this.warning = undefined;
+    this.fileName = undefined;
+  }
+
   private ensureWorker(): ScrubWorker {
     if (!this.worker) {
       this.worker = new ScrubWorker();
@@ -52,26 +64,18 @@ class Session {
   }
 
   /** Called from the input surface. Typing debounces; a paste runs immediately. */
-  setInput(value: string, immediate = false): void {
-    this.input = value;
+  setInput(input: string, immediate = false): void {
+    this.input = input;
     if (this.timer) clearTimeout(this.timer);
-    if (value.trim() === "") {
-      this.token++; // cancel any in-flight response
-      this.worker?.cancel(); // …and settle its promise
-      this.output = "";
-      this.replacements = [];
-      this.scrubbedFrom = "";
-      this.stage = "idle";
-      this.error = undefined;
-      this.warning = undefined;
-      this.fileName = undefined;
+    if (input.trim() === "") {
+      this.clear();
       return;
     }
     this.ensureWorker();
     if (immediate) {
-      void this.run(value);
+      void this.run(input);
     } else {
-      this.timer = setTimeout(() => void this.run(value), DEBOUNCE_MS);
+      this.timer = setTimeout(() => void this.run(input), DEBOUNCE_MS);
     }
   }
 
@@ -90,34 +94,34 @@ class Session {
     if (this.input.trim() !== "") void this.run(this.input);
   }
 
-  keep(value: string): void {
-    if (this.kept.includes(value)) return;
-    this.kept = [...this.kept, value];
+  keep(original: string): void {
+    if (this.kept.includes(original)) return;
+    this.kept = [...this.kept, original];
     void this.run(this.input);
   }
 
-  restore(value: string): void {
-    this.kept = this.kept.filter((v) => v !== value);
+  restore(original: string): void {
+    this.kept = this.kept.filter((keptValue) => keptValue !== original);
     if (this.input.trim() !== "") void this.run(this.input);
   }
 
-  private async run(value: string): Promise<void> {
+  private async run(input: string): Promise<void> {
     const worker = this.ensureWorker();
     const token = ++this.token;
     this.error = undefined;
     this.stage = "working";
     try {
       const overrides = { ...this.overrides, keep: $state.snapshot(this.kept) };
-      const result = await worker.scrub(value, overrides);
+      const outcome = await worker.scrub(input, overrides);
       if (token !== this.token) return; // superseded by a newer request
-      this.output = result.output;
-      this.replacements = result.replacements;
-      this.scrubbedFrom = value;
-      this.warning = result.warning;
+      this.output = outcome.output;
+      this.replacements = outcome.replacements;
+      this.scrubbedFrom = input;
+      this.warning = outcome.warning;
       this.stage = "done";
-    } catch (e) {
+    } catch (error) {
       if (token !== this.token) return; // superseded — its rejection is expected
-      this.error = e instanceof Error ? e.message : String(e);
+      this.error = error instanceof Error ? error.message : String(error);
       this.stage = "error";
     }
   }

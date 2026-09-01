@@ -1,9 +1,11 @@
 import type {
   Detector,
+  KeyDetector,
   LeshyConfig,
   LocaleSetting,
   PreserveRule,
   SemanticConfig,
+  StructuralDetector,
 } from "./types.ts";
 import { builtins } from "./detect/detectors/index.ts";
 import { packs } from "./packs/index.ts";
@@ -59,26 +61,40 @@ export interface KeepRule {
   enabled: boolean;
 }
 
-const toDetector = (r: CustomRule): Detector => {
+const toDetector = (rule: CustomRule): Detector => {
   const base = {
-    id: r.id,
-    label: r.label,
-    type: r.type,
-    enabled: r.enabled,
-    generate: generators[r.type],
-    ...(r.keys ? { keys: new RegExp(r.keys, "i") } : {}),
+    id: rule.id,
+    label: rule.label,
+    type: rule.type,
+    enabled: rule.enabled,
+    generate: generators[rule.type],
   };
-  return r.pattern
-    ? { ...base, kind: "structural", match: new RegExp(r.pattern, "g") }
-    : { ...base, kind: "key", keys: new RegExp(r.keys ?? "(?!)", "i") };
+  const keys = rule.keys ? new RegExp(rule.keys, "i") : undefined;
+
+  if (rule.pattern) {
+    const detector: StructuralDetector = {
+      ...base,
+      kind: "structural",
+      match: new RegExp(rule.pattern, "g"),
+    };
+    if (keys) detector.keys = keys;
+    return detector;
+  }
+
+  const detector: KeyDetector = {
+    ...base,
+    kind: "key",
+    keys: keys ?? new RegExp("(?!)", "i"),
+  };
+  return detector;
 };
 
-const toPreserve = (r: KeepRule): PreserveRule => ({
-  id: r.id,
-  enabled: r.enabled,
-  ...(r.keys ? { keys: new RegExp(r.keys, "i") } : {}),
-  ...(r.match ? { match: new RegExp(r.match) } : {}),
-});
+const toPreserve = (rule: KeepRule): PreserveRule => {
+  const preserveRule: PreserveRule = { id: rule.id, enabled: rule.enabled };
+  if (rule.keys) preserveRule.keys = new RegExp(rule.keys, "i");
+  if (rule.match) preserveRule.match = new RegExp(rule.match);
+  return preserveRule;
+};
 
 /**
  * Serialisable adjustments a UI applies over the code-defined config. Only
@@ -101,53 +117,72 @@ export interface ConfigOverrides {
 }
 
 // A toggle in the UI is the later decision, so it wins over the config's lists.
-const applyOverrides = (config: LeshyConfig, o: ConfigOverrides): LeshyConfig => ({
-  ...config,
-  disable: [
-    ...(config.disable ?? []).filter((id) => !o.enable?.includes(id)),
-    ...(o.disable ?? []),
-  ],
-  enable: [...(config.enable ?? []).filter((id) => !o.disable?.includes(id)), ...(o.enable ?? [])],
-  countries: o.countries ?? config.countries,
-  locale: o.locale ?? config.locale,
-  salt: o.salt ?? config.salt,
-  semantic: {
-    ...config.semantic,
-    ...(o.semanticEnabled === undefined ? {} : { enabled: o.semanticEnabled }),
-  },
-});
+const applyOverrides = (config: LeshyConfig, overrides: ConfigOverrides): LeshyConfig => {
+  const disable = (config.disable ?? []).filter((id) => !overrides.enable?.includes(id));
+  disable.push(...(overrides.disable ?? []));
+
+  const enable = (config.enable ?? []).filter((id) => !overrides.disable?.includes(id));
+  enable.push(...(overrides.enable ?? []));
+
+  const semantic = { ...config.semantic };
+  if (overrides.semanticEnabled !== undefined) semantic.enabled = overrides.semanticEnabled;
+
+  return {
+    ...config,
+    disable,
+    enable,
+    countries: overrides.countries ?? config.countries,
+    locale: overrides.locale ?? config.locale,
+    salt: overrides.salt ?? config.salt,
+    semantic,
+  };
+};
+
+const selectPacks = (countries: string[] | undefined): typeof packs => {
+  if (countries === undefined) return packs;
+  return packs.filter((pack) => countries.includes(pack.id));
+};
+
+const applyDetectorToggles = (
+  detectors: Detector[],
+  disabledIds: Set<string>,
+  enabledIds: Set<string>,
+): Detector[] =>
+  detectors.map((detector) => {
+    if (disabledIds.has(detector.id)) return { ...detector, enabled: false };
+    if (enabledIds.has(detector.id)) return { ...detector, enabled: true };
+    return detector;
+  });
 
 export const resolveConfig = (
   base: LeshyConfig = {},
   overrides?: ConfigOverrides,
 ): ResolvedConfig => {
   const config = overrides ? applyOverrides(base, overrides) : base;
-  const disabled = new Set(config.disable ?? []);
-  const enabled = new Set(config.enable ?? []);
-  const wanted = config.countries;
-  const selected = wanted === undefined ? packs : packs.filter((p) => wanted.includes(p.id));
+  const disabledIds = new Set(config.disable ?? []);
+  const enabledIds = new Set(config.enable ?? []);
+  const selectedPacks = selectPacks(config.countries);
+
   // Packs first: their national-id checksums are the most specific rules in the
   // list, and declaration order breaks equal-tier ties (adr/0004).
-  const all = [
-    ...selected.flatMap((p) => p.detectors),
+  const configuredDetectors = [
+    ...selectedPacks.flatMap((pack) => pack.detectors),
     ...builtins,
     ...(config.detectors ?? []),
     ...(overrides?.rules ?? []).map(toDetector),
   ];
-  const detectors = all.map((d) => {
-    if (disabled.has(d.id)) return { ...d, enabled: false };
-    if (enabled.has(d.id)) return { ...d, enabled: true };
-    return d;
-  });
+  const detectors = applyDetectorToggles(configuredDetectors, disabledIds, enabledIds);
+  const preserve = [
+    ...defaultPreserve,
+    ...selectedPacks.flatMap((pack) => pack.preserve ?? []),
+    ...(config.preserve ?? []),
+    ...(overrides?.keepRules ?? []).map(toPreserve),
+  ];
+
   return {
-    countries: selected.map((p) => p.id),
+    countries: selectedPacks.map((pack) => pack.id),
     detectors,
-    preserve: [
-      ...defaultPreserve,
-      ...selected.flatMap((p) => p.preserve ?? []),
-      ...(config.preserve ?? []),
-      ...(overrides?.keepRules ?? []).map(toPreserve),
-    ],
+    preserve,
     salt: config.salt ?? DEFAULT_SALT,
     locale: config.locale ?? "auto",
     keep: overrides?.keep ?? [],

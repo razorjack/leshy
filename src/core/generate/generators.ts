@@ -22,68 +22,74 @@ export interface PersonParts {
   last: string;
 }
 export const personParts = (seed: number, locale: Locale): PersonParts => {
-  const f = fakerFor(seed, locale);
-  return { first: f.person.firstName(), last: f.person.lastName() };
+  const faker = fakerFor(seed, locale);
+  return { first: faker.person.firstName(), last: faker.person.lastName() };
 };
 
-const email: Generate = (ctx) => {
-  const at = ctx.original.lastIndexOf("@");
-  const localRaw = at > 0 ? ctx.original.slice(0, at) : ctx.original;
-  const tokens = nameTokens(localRaw);
+const email: Generate = (context) => {
+  const at = context.original.lastIndexOf("@");
+  const sourceLocalPart = at > 0 ? context.original.slice(0, at) : context.original;
+  const tokens = nameTokens(sourceLocalPart);
   let local: string;
   if (tokens) {
     // Locale from the same token sequence the person seed is: a value-derived
     // locale would hand one shared seed to two faker locales and split the
     // person from their email into two people (adr/0002 linked identities).
-    const { first, last } = personParts(ctx.personSeed(tokens), ctx.localeFor(tokens.join(" ")));
+    const { first, last } = personParts(
+      context.personSeed(tokens),
+      context.localeFor(tokens.join(" ")),
+    );
     local = tokens.length > 1 ? `${first}.${last}` : first;
   } else {
-    local = fakerFor(ctx.seed, "en").internet.username();
+    local = fakerFor(context.seed, "en").internet.username();
   }
   local = local.toLowerCase().replace(/[^a-z0-9._+-]/g, "") || "user";
-  const domain = fakerFor(ctx.seedFor("domain"), "en").internet.domainWord();
+  const domain = fakerFor(context.seedFor("domain"), "en").internet.domainWord();
   return `${local}@${domain}.example`;
 };
 
 // Prefix lengths of the RFC 1918 private ranges: what a fake keeps verbatim.
-const PRIVATE: Array<{ re: RegExp; keep: number }> = [
-  { re: /^10\./, keep: 1 },
-  { re: /^172\.(?:1[6-9]|2\d|3[01])\./, keep: 2 },
-  { re: /^192\.168\./, keep: 2 },
+const PRIVATE: Array<{ pattern: RegExp; keep: number }> = [
+  { pattern: /^10\./, keep: 1 },
+  { pattern: /^172\.(?:1[6-9]|2\d|3[01])\./, keep: 2 },
+  { pattern: /^192\.168\./, keep: 2 },
 ];
 
-const ipv4: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  const priv = PRIVATE.find((p) => p.re.test(ctx.original));
-  if (priv) {
-    const octets = ctx.original.split(".");
+const ipv4: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  const privateRange = PRIVATE.find((range) => range.pattern.test(context.original));
+  if (privateRange) {
+    const octets = context.original.split(".");
     return octets
-      .map((o, i) => (i < priv.keep ? o : String(f.number.int({ min: 0, max: 255 }))))
+      .map((octet, index) => {
+        if (index < privateRange.keep) return octet;
+        return String(faker.number.int({ min: 0, max: 255 }));
+      })
       .join(".");
   }
   // Public → RFC 5737 TEST-NET (a /24 documentation block).
-  const block = f.helpers.arrayElement(["192.0.2", "198.51.100", "203.0.113"]);
-  return `${block}.${f.number.int({ min: 0, max: 255 })}`;
+  const block = faker.helpers.arrayElement(["192.0.2", "198.51.100", "203.0.113"]);
+  return `${block}.${faker.number.int({ min: 0, max: 255 })}`;
 };
 
-const ipv6: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
+const ipv6: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
   const groups = Array.from({ length: 6 }, () =>
-    f.string.hexadecimal({ length: 4, casing: "lower", prefix: "" }),
+    faker.string.hexadecimal({ length: 4, casing: "lower", prefix: "" }),
   );
   return `2001:db8:${groups.join(":")}`;
 };
 
-const mac: Generate = (ctx) => {
-  const sep = ctx.original.includes("-") ? "-" : ":";
-  const f = fakerFor(ctx.seed, "en");
-  const hi = f.string.hexadecimal({ length: 1, casing: "upper", prefix: "" });
+const mac: Generate = (context) => {
+  const separator = context.original.includes("-") ? "-" : ":";
+  const faker = fakerFor(context.seed, "en");
+  const highNibble = faker.string.hexadecimal({ length: 1, casing: "upper", prefix: "" });
   // Second nibble ∈ {2,6,A,E}: locally-administered (bit 1) unicast (bit 0 clear).
-  const first = `${hi}${f.helpers.arrayElement(["2", "6", "A", "E"])}`;
+  const first = `${highNibble}${faker.helpers.arrayElement(["2", "6", "A", "E"])}`;
   const rest = Array.from({ length: 5 }, () =>
-    f.string.hexadecimal({ length: 2, casing: "upper", prefix: "" }),
+    faker.string.hexadecimal({ length: 2, casing: "upper", prefix: "" }),
   );
-  return [first, ...rest].join(sep);
+  return [first, ...rest].join(separator);
 };
 
 // E.164 country codes are prefix-free: zones 1 and 7 are one digit, and among
@@ -103,17 +109,20 @@ const countryCodeLength = (digits: string): number => {
 // digit per source digit, keep the country code after a leading '+', then lay
 // the result into the source's separators. "+48 601 234 567", "+48601234567"
 // and "48 601 234 567" are one identity and must read as one fake.
-const phone: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  const digits = ctx.normalized.replace(/\D/g, "");
-  const keep = ctx.original.trimStart().startsWith("+") ? countryCodeLength(digits) : 0;
+const phone: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  const digits = context.normalized.replace(/\D/g, "");
+  const keptDigits = context.original.trimStart().startsWith("+") ? countryCodeLength(digits) : 0;
   // One draw per position, kept or not, so the stream stays aligned across layouts.
-  const fake = Array.from(digits, (d, k) => {
-    const drawn = digit(f);
-    return k < keep ? d : drawn;
+  const fakeDigits = Array.from(digits, (sourceDigit, index) => {
+    const drawnDigit = digit(faker);
+    return index < keptDigits ? sourceDigit : drawnDigit;
   });
-  let k = 0;
-  return Array.from(ctx.original, (c) => (/\d/.test(c) ? (fake[k++] ?? c) : c)).join("");
+  let digitIndex = 0;
+  return Array.from(context.original, (character) => {
+    if (!/\d/.test(character)) return character;
+    return fakeDigits[digitIndex++] ?? character;
+  }).join("");
 };
 
 /** Luhn check digit for a digit prefix (the appended digit sits un-doubled). */
@@ -132,47 +141,56 @@ const luhnCheckDigit = (prefix: string[]): string => {
   return String((10 - (sum % 10)) % 10);
 };
 
-const creditCard: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  const chars = Array.from(ctx.original);
-  const idx = chars.map((c, i) => (/\d/.test(c) ? i : -1)).filter((i) => i >= 0);
-  const out = idx.map((i) => chars[i]!);
-  for (let k = 1; k < out.length - 1; k++) out[k] = digit(f); // keep brand digit, hash middle
-  out[out.length - 1] = luhnCheckDigit(out.slice(0, -1)); // fix the check digit
-  idx.forEach((i, k) => (chars[i] = out[k]!));
-  return chars.join("");
+const creditCard: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  const characters = Array.from(context.original);
+  const digitPositions = characters
+    .map((character, index) => (/\d/.test(character) ? index : -1))
+    .filter((index) => index >= 0);
+  const fakeDigits = digitPositions.map((index) => characters[index]!);
+
+  for (let index = 1; index < fakeDigits.length - 1; index++) {
+    fakeDigits[index] = digit(faker);
+  }
+  fakeDigits[fakeDigits.length - 1] = luhnCheckDigit(fakeDigits.slice(0, -1));
+  digitPositions.forEach((position, index) => {
+    characters[position] = fakeDigits[index]!;
+  });
+  return characters.join("");
 };
 
 /** Two IBAN check digits so `country + check + bban` passes mod-97. */
 const ibanCheckDigits = (country: string, bban: string): string => {
   const expanded = `${bban}${country}00`.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
-  let r = 0;
-  for (const ch of expanded) r = (r * 10 + Number(ch)) % 97;
-  return String(98 - r).padStart(2, "0");
+  let remainder = 0;
+  for (const character of expanded) {
+    remainder = (remainder * 10 + Number(character)) % 97;
+  }
+  return String(98 - remainder).padStart(2, "0");
 };
 
-const iban: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  const raw = ctx.original;
-  const country = raw.slice(0, 2);
-  const bban = Array.from(raw.slice(4), (ch) =>
-    /\d/.test(ch) ? digit(f) : f.string.alpha({ length: 1, casing: "upper" }),
+const iban: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  const country = context.original.slice(0, 2);
+  const bban = Array.from(context.original.slice(4), (character) =>
+    /\d/.test(character) ? digit(faker) : faker.string.alpha({ length: 1, casing: "upper" }),
   ).join("");
   return `${country}${ibanCheckDigits(country, bban)}${bban}`;
 };
 
 const B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-const jwt: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  const seg = (len: number): string =>
-    Array.from({ length: Math.max(len, 1) }, () => B64URL[f.number.int({ min: 0, max: 63 })]).join(
-      "",
-    );
+const jwt: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  const fakeSegment = (length: number): string =>
+    Array.from(
+      { length: Math.max(length, 1) },
+      () => B64URL[faker.number.int({ min: 0, max: 63 })],
+    ).join("");
   // Three base64url pseudoword segments of the source's lengths — never decodable.
-  return ctx.original
+  return context.original
     .split(".")
-    .map((p) => seg(p.length))
+    .map((segment) => fakeSegment(segment.length))
     .join(".");
 };
 
@@ -196,164 +214,184 @@ const API_PREFIXES = [
 ];
 
 /** Same length, same character classes, same separators, none of the bytes. */
-const reshape = (f: Faker, src: string): string =>
-  Array.from(src, (ch) => {
-    if (/[0-9]/.test(ch)) return digit(f);
-    if (/[A-Z]/.test(ch)) return f.string.alpha({ length: 1, casing: "upper" });
-    if (/[a-z]/.test(ch)) return f.string.alpha({ length: 1, casing: "lower" });
-    return ch; // preserve separators like '_' and '-'
+const reshape = (faker: Faker, source: string): string =>
+  Array.from(source, (character) => {
+    if (/[0-9]/.test(character)) return digit(faker);
+    if (/[A-Z]/.test(character)) {
+      return faker.string.alpha({ length: 1, casing: "upper" });
+    }
+    if (/[a-z]/.test(character)) {
+      return faker.string.alpha({ length: 1, casing: "lower" });
+    }
+    return character; // preserve separators like '_' and '-'
   }).join("");
 
-const apiKey: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  const src = ctx.original;
+const apiKey: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  const source = context.original;
   // Only a recognised vendor prefix survives. Anything else is opaque secret
   // material — key-context hits ('secret', 'token') have no prefix by
   // definition, and keeping their first characters leaks the real value.
-  const prefix = API_PREFIXES.find((p) => src.startsWith(p)) ?? "";
-  return `${prefix}${reshape(f, src.slice(prefix.length))}`;
+  const prefix = API_PREFIXES.find((candidate) => source.startsWith(candidate)) ?? "";
+  return `${prefix}${reshape(faker, source.slice(prefix.length))}`;
 };
 
 // Credential material has no realistic form to imitate and no reserved
 // namespace to draw from, so the fake keeps only the shape: a length or charset
 // bug still reproduces on the scrubbed text. Not idempotent across passes, same
 // as api-key and jwt — re-scrubbing reshapes a fake into another fake.
-const secret: Generate = (ctx) => reshape(fakerFor(ctx.seed, "en"), ctx.original);
+const secret: Generate = (context) => reshape(fakerFor(context.seed, "en"), context.original);
 
 // Dates keep their layout and only the digit runs change: a four-digit run is
 // the year, the first two short runs are month and day and each stays within
 // 1..12, so the fake is a valid date whether the source was DD-MM or MM-DD.
 // Any later short run (a two-digit year, a time) gets a value of its own width.
-const dob: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  let short = 0;
-  return mapDigitRuns(ctx.original, (run) => {
-    if (run.length === 4) return String(f.number.int({ min: 1940, max: 2005 }));
-    if (run.length === 2 && short++ < 2) return pad(f.number.int({ min: 1, max: 12 }), 2);
-    return Array.from(run, () => digit(f)).join("");
+const dob: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  let shortRunCount = 0;
+  return mapDigitRuns(context.original, (run) => {
+    if (run.length === 4) return String(faker.number.int({ min: 1940, max: 2005 }));
+    if (run.length === 2 && shortRunCount++ < 2) {
+      return pad(faker.number.int({ min: 1, max: 12 }), 2);
+    }
+    return Array.from(run, () => digit(faker)).join("");
   });
 };
 
 // Each decimal keeps its sign and digit counts; the integer part stays in a
 // range that is a valid latitude and longitude either way.
-const geo: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  return ctx.original.replace(/\d+(?:\.\d+)?/g, (num) => {
-    const [int = "", frac] = num.split(".");
-    const whole =
-      int.length >= 3
-        ? String(f.number.int({ min: 100, max: 179 }))
-        : int.length === 2
-          ? String(f.number.int({ min: 10, max: 89 }))
-          : String(f.number.int({ min: 0, max: 9 }));
-    return frac === undefined ? whole : `${whole}.${Array.from(frac, () => digit(f)).join("")}`;
+const coordinateWhole = (faker: Faker, length: number): string => {
+  if (length >= 3) return String(faker.number.int({ min: 100, max: 179 }));
+  if (length === 2) return String(faker.number.int({ min: 10, max: 89 }));
+  return String(faker.number.int({ min: 0, max: 9 }));
+};
+
+const geo: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  return context.original.replace(/\d+(?:\.\d+)?/g, (decimal) => {
+    const [integer = "", fraction] = decimal.split(".");
+    const whole = coordinateWhole(faker, integer.length);
+    if (fraction === undefined) return whole;
+
+    const fakeFraction = Array.from(fraction, () => digit(faker)).join("");
+    return `${whole}.${fakeFraction}`;
   });
 };
 
-const cardCode: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  return mapDigitRuns(ctx.original, (run) => Array.from(run, () => digit(f)).join(""));
+const cardCode: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  return mapDigitRuns(context.original, (run) => Array.from(run, () => digit(faker)).join(""));
 };
 
 // MM/YY, MM/YYYY, YYYY-MM: the month run is the first two-digit run, the year
 // is the four-digit run or the remaining two-digit one, always in the future.
-const cardExpiry: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
+const cardExpiry: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
   let seenMonth = false;
-  return mapDigitRuns(ctx.original, (run) => {
-    if (run.length === 4) return String(f.number.int({ min: 2027, max: 2033 }));
+  return mapDigitRuns(context.original, (run) => {
+    if (run.length === 4) return String(faker.number.int({ min: 2027, max: 2033 }));
     if (run.length === 2 && !seenMonth) {
       seenMonth = true;
-      return pad(f.number.int({ min: 1, max: 12 }), 2);
+      return pad(faker.number.int({ min: 1, max: 12 }), 2);
     }
-    if (run.length === 2) return String(f.number.int({ min: 27, max: 33 }));
-    return Array.from(run, () => digit(f)).join("");
+    if (run.length === 2) return String(faker.number.int({ min: 27, max: 33 }));
+    return Array.from(run, () => digit(faker)).join("");
   });
 };
 
 // One fake label per source label under the reserved `.example` TLD, so the
 // depth survives and a re-scrub recognises the result. A port stays.
-const hostname: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  const [host = "", ...rest] = ctx.original.split(":");
+const hostname: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  const [host = "", ...portParts] = context.original.split(":");
   const labels = host.split(".").filter(Boolean);
-  const fake = labels.slice(0, Math.max(labels.length - 1, 1)).map(() => f.internet.domainWord());
-  return [`${fake.join(".")}.example`, ...rest].join(":");
+  const fakeLabels = labels
+    .slice(0, Math.max(labels.length - 1, 1))
+    .map(() => faker.internet.domainWord());
+  return [`${fakeLabels.join(".")}.example`, ...portParts].join(":");
 };
 
-const uuid: Generate = (ctx) => fakerFor(ctx.seed, "en").string.uuid();
+const uuid: Generate = (context) => fakerFor(context.seed, "en").string.uuid();
 
 /** Reproduce the source word's casing on a faked word. */
-const matchCase = (fake: string, src: string): string => {
-  if (src.length > 0 && src === src.toUpperCase() && src !== src.toLowerCase()) {
+const matchCase = (fake: string, source: string): string => {
+  if (source.length > 0 && source === source.toUpperCase() && source !== source.toLowerCase()) {
     return fake.toUpperCase();
   }
-  if (src === src.toLowerCase()) return fake.toLowerCase();
+  if (source === source.toLowerCase()) return fake.toLowerCase();
   return fake; // Titlecase / mixed → faker's default titlecase
 };
 
-const person: Generate = (ctx) => {
-  const tokens = nameTokens(ctx.original) ?? [ctx.normalized];
-  const locale = ctx.localeFor(tokens.join(" ")); // see email: linkage, not value
-  const { first, last } = personParts(ctx.personSeed(tokens), locale); // links to email
-  const words = ctx.original.split(/\s+/).filter(Boolean);
+const person: Generate = (context) => {
+  const tokens = nameTokens(context.original) ?? [context.normalized];
+  const locale = context.localeFor(tokens.join(" ")); // see email: linkage, not value
+  const { first, last } = personParts(context.personSeed(tokens), locale); // links to email
+  const words = context.original.split(/\s+/).filter(Boolean);
   let names: string[];
-  if (words.length <= 1) names = [first];
-  else if (words.length === 2) names = [first, last];
-  else {
-    const mids = Array.from({ length: words.length - 2 }, (_, k) =>
-      fakerFor(ctx.seedFor(`mid:${k}`), locale).person.firstName(),
+  if (words.length <= 1) {
+    names = [first];
+  } else if (words.length === 2) {
+    names = [first, last];
+  } else {
+    const middleNames = Array.from({ length: words.length - 2 }, (_, index) =>
+      fakerFor(context.seedFor(`mid:${index}`), locale).person.firstName(),
     );
-    names = [first, ...mids, last];
+    names = [first, ...middleNames, last];
   }
-  return names.map((n, i) => matchCase(n, words[i] ?? "")).join(" ");
+  return names.map((name, index) => matchCase(name, words[index] ?? "")).join(" ");
 };
 
 // A login links to the person the same way an email local part does, keeps
 // the source's separator style and its trailing digits (reshaped), and stays
 // within the charset logins are made of.
-const username: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  const tokens = nameTokens(ctx.original);
+const username: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  const tokens = nameTokens(context.original);
   let name: string;
   if (tokens) {
-    const { first, last } = personParts(ctx.personSeed(tokens), ctx.localeFor(tokens.join(" ")));
-    const sep = ctx.original.match(/[._-]/)?.[0] ?? "";
-    name = tokens.length > 1 ? `${first}${sep}${last}` : first;
+    const { first, last } = personParts(
+      context.personSeed(tokens),
+      context.localeFor(tokens.join(" ")),
+    );
+    const separator = context.original.match(/[._-]/)?.[0] ?? "";
+    name = tokens.length > 1 ? `${first}${separator}${last}` : first;
   } else {
-    name = f.internet.username();
+    name = faker.internet.username();
   }
-  const digits = ctx.original.match(/\d+$/)?.[0] ?? "";
-  const tail = Array.from(digits, () => digit(f)).join("");
-  return `${matchCase(name, ctx.original).replace(/[^A-Za-z0-9._-]/g, "") || "user"}${tail}`;
+  const sourceDigits = context.original.match(/\d+$/)?.[0] ?? "";
+  const fakeDigits = Array.from(sourceDigits, () => digit(faker)).join("");
+  const safeName = matchCase(name, context.original).replace(/[^A-Za-z0-9._-]/g, "");
+  return `${safeName || "user"}${fakeDigits}`;
 };
 
-const address: Generate = (ctx) => {
-  const locale = ctx.localeFor();
-  const f = fakerFor(ctx.seed, locale);
+const address: Generate = (context) => {
+  const locale = context.localeFor();
+  const faker = fakerFor(context.seed, locale);
   switch (LOCALES[locale].addressOrder) {
     case "city-state-zip":
-      return `${f.location.streetAddress()}, ${f.location.city()}, ${f.location.state({ abbreviated: true })} ${f.location.zipCode()}`;
+      return `${faker.location.streetAddress()}, ${faker.location.city()}, ${faker.location.state({ abbreviated: true })} ${faker.location.zipCode()}`;
     case "city-zip":
-      return `${f.location.streetAddress()}, ${f.location.city()} ${f.location.zipCode()}`;
+      return `${faker.location.streetAddress()}, ${faker.location.city()} ${faker.location.zipCode()}`;
     default:
-      return `${f.location.streetAddress()}, ${f.location.zipCode()} ${f.location.city()}`;
+      return `${faker.location.streetAddress()}, ${faker.location.zipCode()} ${faker.location.city()}`;
   }
 };
 
-const street: Generate = (ctx) => fakerFor(ctx.seed, ctx.localeFor()).location.streetAddress();
+const street: Generate = (context) =>
+  fakerFor(context.seed, context.localeFor()).location.streetAddress();
 
-const city: Generate = (ctx) => fakerFor(ctx.seed, ctx.localeFor()).location.city();
+const city: Generate = (context) => fakerFor(context.seed, context.localeFor()).location.city();
 
 // A postal code is a formatted code, not prose. Swapping digit for digit and
 // letter for letter keeps every country's shape (00-624, SW1A 1AA, 97477-1234)
 // without having to know which country it belongs to.
-const postcode: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  return Array.from(ctx.original, (ch) => {
-    if (/\d/.test(ch)) return digit(f);
-    if (!/\p{L}/u.test(ch)) return ch;
-    return f.string.alpha({ length: 1, casing: ch === ch.toLowerCase() ? "lower" : "upper" });
+const postcode: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  return Array.from(context.original, (character) => {
+    if (/\d/.test(character)) return digit(faker);
+    if (!/\p{L}/u.test(character)) return character;
+    const casing = character === character.toLowerCase() ? "lower" : "upper";
+    return faker.string.alpha({ length: 1, casing });
   }).join("");
 };
 
@@ -366,9 +404,12 @@ const EXTRA_SUFFIXES = ["Oy", "A/S", "ApS", "d.o.o."];
 const pattern = (suffix: string): string => suffix.replaceAll(".", "\\.?").replaceAll(" ", "\\s*");
 
 const SUFFIXES = [
-  ...new Set([...locales.flatMap((l) => LOCALES[l].orgSuffixes ?? []), ...EXTRA_SUFFIXES]),
+  ...new Set([
+    ...locales.flatMap((locale) => LOCALES[locale].orgSuffixes ?? []),
+    ...EXTRA_SUFFIXES,
+  ]),
 ]
-  .sort((a, b) => b.length - a.length)
+  .sort((left, right) => right.length - left.length)
   .map(pattern);
 
 // Legal suffixes kept verbatim; only the company name is faked (adr/0002).
@@ -379,11 +420,11 @@ const FAKER_SUFFIX = new RegExp(
   "i",
 );
 
-const org: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, ctx.localeFor());
-  const m = ctx.original.match(ORG_SUFFIX);
-  const suffix = m ? m[1] : "";
-  const base = f.company.name().replace(FAKER_SUFFIX, "").trim() || f.person.lastName();
+const org: Generate = (context) => {
+  const faker = fakerFor(context.seed, context.localeFor());
+  const suffixMatch = context.original.match(ORG_SUFFIX);
+  const suffix = suffixMatch?.[1] ?? "";
+  const base = faker.company.name().replace(FAKER_SUFFIX, "").trim() || faker.person.lastName();
   return suffix ? `${base} ${suffix}` : base;
 };
 

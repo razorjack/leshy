@@ -11,8 +11,10 @@ const covered = (spans: Span[], input: string, text: string): boolean => {
   const start = input.indexOf(text);
   const end = start + text.length;
   const marks = Array.from({ length: text.length }, () => false);
-  for (const s of spans) {
-    for (let i = Math.max(s.start, start); i < Math.min(s.end, end); i++) marks[i - start] = true;
+  for (const span of spans) {
+    for (let i = Math.max(span.start, start); i < Math.min(span.end, end); i++) {
+      marks[i - start] = true;
+    }
   }
   return start >= 0 && marks.every(Boolean);
 };
@@ -20,18 +22,24 @@ const covered = (spans: Span[], input: string, text: string): boolean => {
 const touched = (spans: Span[], input: string, text: string): boolean => {
   const start = input.indexOf(text);
   const end = start + text.length;
-  return spans.some((s) => s.start < end && s.end > start);
+  return spans.some((span) => span.start < end && span.end > start);
 };
 
 describe("detection without the model (structural + key-context)", () => {
   for (const sample of samples) {
     it(`handles ${sample.name}`, async () => {
       const spans = await detect(sample.input, { config });
-      for (const g of sample.gold) {
-        if (g.expect === "catch") {
-          expect(covered(spans, sample.input, g.text), `should catch ${g.text}`).toBe(true);
+      for (const expectation of sample.gold) {
+        if (expectation.expect === "catch") {
+          expect(
+            covered(spans, sample.input, expectation.text),
+            `should catch ${expectation.text}`,
+          ).toBe(true);
         } else {
-          expect(touched(spans, sample.input, g.text), `should preserve ${g.text}`).toBe(false);
+          expect(
+            touched(spans, sample.input, expectation.text),
+            `should preserve ${expectation.text}`,
+          ).toBe(false);
         }
       }
     });
@@ -42,13 +50,13 @@ describe("same-type overlap", () => {
   it("keeps a validated extent instead of the union", async () => {
     const input = '{"pesel":"44051401359 (old)"}';
     const spans = await detect(input, { config });
-    expect(spans.map((s) => s.text)).toEqual(["44051401359"]);
+    expect(spans.map((span) => span.text)).toEqual(["44051401359"]);
   });
 
   it("unions an unvalidated structural hit with its key-context span", async () => {
     const input = '{"email":"foo@bar.com/extra"}';
     const spans = await detect(input, { config });
-    expect(spans.map((s) => s.text)).toEqual(["foo@bar.com/extra"]);
+    expect(spans.map((span) => span.text)).toEqual(["foo@bar.com/extra"]);
   });
 });
 
@@ -93,27 +101,27 @@ describe("key routing", () => {
   for (const [key, detector] of routes) {
     it(`routes ${key} to ${detector}`, async () => {
       const spans = await detect(`${key}=zqvx7`, { config });
-      expect(spans.map((s) => s.detector)).toEqual([detector]);
+      expect(spans.map((span) => span.detector)).toEqual([detector]);
     });
   }
 
   it("catches an X-Api-Key header and its logfmt form", async () => {
     const input = "X-Api-Key: 9f8a7b6c5d4e3f2a1b0c\nx-api-key=abcdef0123456789";
     const spans = await detect(input, { config });
-    expect(spans.map((s) => s.text)).toEqual(["9f8a7b6c5d4e3f2a1b0c", "abcdef0123456789"]);
+    expect(spans.map((span) => span.text)).toEqual(["9f8a7b6c5d4e3f2a1b0c", "abcdef0123456789"]);
   });
 
   it("routes email_address to the email detector, not to address", async () => {
     const input = '{"email_address":"jan at gmail dot com"}';
     const spans = await detect(input, { config });
-    expect(spans.map((s) => s.detector)).toEqual(["email"]);
+    expect(spans.map((span) => span.detector)).toEqual(["email"]);
   });
 });
 
 describe("key-value scanning", () => {
   it("yields one pair per query parameter, the first included", () => {
-    const kvs = scanKeyValues("GET https://x.io/u?token=abc123def456&api_key=zzz9 ok");
-    expect(kvs.map((k) => `${k.key}=${k.value}`)).toEqual([
+    const keyValues = scanKeyValues("GET https://x.io/u?token=abc123def456&api_key=zzz9 ok");
+    expect(keyValues.map((keyValue) => `${keyValue.key}=${keyValue.value}`)).toEqual([
       "https=//x.io/u",
       "token=abc123def456",
       "api_key=zzz9",
@@ -151,25 +159,25 @@ describe("resolve stage", () => {
 
   it("suppresses semantic hits on ids under preserve keys", async () => {
     const input = 'user_id=98123 msg="ok"';
-    const semantic = (s: string) => Promise.resolve([semanticSpan(s, "98123", "person")]);
+    const semantic = (text: string) => Promise.resolve([semanticSpan(text, "98123", "person")]);
     const spans = await detect(input, { config, semantic });
     expect(touched(spans, input, "98123")).toBe(false);
   });
 
   it("drops uncorroborated semantic hits of machine-checkable types", async () => {
     const input = "level=info marker=xyzzy";
-    const semantic = (s: string) => Promise.resolve([semanticSpan(s, "xyzzy", "email")]);
+    const semantic = (text: string) => Promise.resolve([semanticSpan(text, "xyzzy", "email")]);
     const spans = await detect(input, { config, semantic });
     expect(touched(spans, input, "xyzzy")).toBe(false);
   });
 
   it("merges adjacent semantic address fragments across short glue", async () => {
     const input = "moved to ul. Marszałkowska 1, 00-624 Warszawa yesterday";
-    const semantic = (s: string) =>
+    const semantic = (text: string) =>
       Promise.resolve([
-        semanticSpan(s, "ul. Marszałkowska", "address"),
-        semanticSpan(s, "00-624", "address"),
-        semanticSpan(s, "Warszawa", "address"),
+        semanticSpan(text, "ul. Marszałkowska", "address"),
+        semanticSpan(text, "00-624", "address"),
+        semanticSpan(text, "Warszawa", "address"),
       ]);
     const spans = await detect(input, { config, semantic });
     expect(covered(spans, input, "ul. Marszałkowska 1, 00-624 Warszawa")).toBe(true);
@@ -177,10 +185,10 @@ describe("resolve stage", () => {
 
   it("never lets a shorter winner shrink coverage (losers are trimmed)", async () => {
     const input = "contact Jan Kowalski jr";
-    const semantic = (s: string) =>
+    const semantic = (text: string) =>
       Promise.resolve([
-        semanticSpan(s, "Jan", "person", 0.95),
-        semanticSpan(s, "Jan Kowalski jr", "person", 0.9),
+        semanticSpan(text, "Jan", "person", 0.95),
+        semanticSpan(text, "Jan Kowalski jr", "person", 0.9),
       ]);
     const spans = await detect(input, { config, semantic });
     expect(covered(spans, input, "Jan Kowalski jr")).toBe(true);
@@ -209,13 +217,13 @@ describe("resolve stage", () => {
     const input = Array.from({ length: 4000 }, () => line).join("\n");
     const spans = await detect(input, { config });
     expect(spans).toHaveLength(8000); // email + ip per line, ids preserved
-    for (const s of spans) expect(input.slice(s.start, s.end)).toBe(s.text);
+    for (const span of spans) expect(input.slice(span.start, span.end)).toBe(span.text);
   });
 
   it("keeps timestamps out of results even when tagged by the model", async () => {
     const input = "seen 2024-01-02T10:00:00Z at gate";
-    const semantic = (s: string) =>
-      Promise.resolve([semanticSpan(s, "2024-01-02T10:00:00Z", "address")]);
+    const semantic = (text: string) =>
+      Promise.resolve([semanticSpan(text, "2024-01-02T10:00:00Z", "address")]);
     const spans = await detect(input, { config, semantic });
     expect(touched(spans, input, "2024-01-02T10:00:00Z")).toBe(false);
   });
@@ -223,14 +231,14 @@ describe("resolve stage", () => {
 
 describe("key-value scanner", () => {
   it("ends an unquoted value at a query-string or cookie separator", () => {
-    const kvs = scanKeyValues("GET /users?email=jan@corp.com&token=abc HTTP/1.1");
-    expect(kvs.map((kv) => [kv.key, kv.value])).toEqual([
+    const keyValues = scanKeyValues("GET /users?email=jan@corp.com&token=abc HTTP/1.1");
+    expect(keyValues.map((keyValue) => [keyValue.key, keyValue.value])).toEqual([
       ["email", "jan@corp.com"],
       ["token", "abc"],
     ]);
     const cookie = scanKeyValues("Cookie: session=abc123; user_email=jan@corp.com");
-    expect(cookie.map((kv) => kv.value)).toContain("jan@corp.com");
-    expect(cookie.every((kv) => !kv.value.includes(";"))).toBe(true);
+    expect(cookie.map((keyValue) => keyValue.value)).toContain("jan@corp.com");
+    expect(cookie.every((keyValue) => !keyValue.value.includes(";"))).toBe(true);
   });
 
   it("keeps the surrounding structure intact when scrubbing a query string", async () => {

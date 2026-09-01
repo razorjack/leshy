@@ -37,14 +37,23 @@ export type SeedCache = Map<string, number>;
  * `cache` skips the SHA-256 round trip for a value already seen in the run: a
  * log repeats the same IP thousands of times, and the seed is the same each time.
  */
-export const makeContext = async (
-  original: string,
-  type: EntityType,
-  salt: string,
-  locale: LocaleSetting = "auto",
+export interface MakeContextOptions {
+  original: string;
+  type: EntityType;
+  salt: string;
+  locale?: LocaleSetting;
+  retry?: number;
+  cache?: SeedCache;
+}
+
+export const makeContext = async ({
+  original,
+  type,
+  salt,
+  locale = "auto",
   retry = 0,
-  cache?: SeedCache,
-): Promise<GenerateContext> => {
+  cache,
+}: MakeContextOptions): Promise<GenerateContext> => {
   const normalized = normalise(original, type);
   const tag = retry > 0 ? `:retry:${retry}` : "";
   const scope = `${type}${tag}`;

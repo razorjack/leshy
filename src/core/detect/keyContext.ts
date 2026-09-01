@@ -26,30 +26,36 @@ const KV =
 const BARE_LITERAL = /^(?:null|nil|true|false|undefined)$/i;
 
 export const scanKeyValues = (input: string): KeyValue[] => {
-  const out: KeyValue[] = [];
-  for (const m of input.matchAll(KV)) {
-    const key = m[1] ?? m[2] ?? m[3];
-    const value = m[4] ?? m[5] ?? m[6];
+  const keyValues: KeyValue[] = [];
+  for (const match of input.matchAll(KV)) {
+    const key = match[1] ?? match[2] ?? match[3];
+    const value = match[4] ?? match[5] ?? match[6];
     if (key === undefined || value === undefined || value === "") continue;
-    const quoted = m[6] === undefined;
-    const valueStart = m.index + m[0].length - value.length - (quoted ? 1 : 0);
-    out.push({ key, value, valueStart, valueEnd: valueStart + value.length, quoted });
+    const quoted = match[6] === undefined;
+    const closingQuoteLength = quoted ? 1 : 0;
+    const valueStart = match.index + match[0].length - value.length - closingQuoteLength;
+    keyValues.push({ key, value, valueStart, valueEnd: valueStart + value.length, quoted });
   }
-  return out;
+  return keyValues;
 };
 
 /** Values under PII-suggesting keys become key-context spans of that detector. */
-export const detectByKey = (input: string, detectors: Detector[], kvs?: KeyValue[]): Span[] => {
+export const detectByKey = (
+  input: string,
+  detectors: Detector[],
+  keyValues = scanKeyValues(input),
+): Span[] => {
   const spans: Span[] = [];
-  const keyed = detectors.filter((d) => d.enabled && d.keys);
-  for (const kv of kvs ?? scanKeyValues(input)) {
-    if (BARE_LITERAL.test(kv.value)) continue;
-    const detector = keyed.find((d) => d.keys?.test(kv.key));
+  const keyedDetectors = detectors.filter((detector) => detector.enabled && detector.keys);
+
+  for (const keyValue of keyValues) {
+    if (BARE_LITERAL.test(keyValue.value)) continue;
+    const detector = keyedDetectors.find((candidate) => candidate.keys?.test(keyValue.key));
     if (!detector) continue;
     spans.push({
-      start: kv.valueStart,
-      end: kv.valueEnd,
-      text: kv.value,
+      start: keyValue.valueStart,
+      end: keyValue.valueEnd,
+      text: keyValue.value,
       type: detector.type,
       detector: detector.id,
       source: "key-context",

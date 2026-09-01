@@ -13,20 +13,20 @@ export const fakerFor = (seed: number, locale: Locale): Faker => {
   return faker;
 };
 
-const hits = (text: string, markers: RegExp[]): number =>
-  markers.reduce((n, re) => n + (text.match(re)?.length ?? 0), 0);
+const countMarkerHits = (text: string, markers: RegExp[]): number =>
+  markers.reduce((total, marker) => total + (text.match(marker)?.length ?? 0), 0);
 
 /** The locale whose markers hit `text` most often; DEFAULT_LOCALE when none do. */
 export const localeFor = (text: string): Locale => {
   let best = DEFAULT_LOCALE;
   let bestHits = 0;
-  for (const id of locales) {
-    const markers = LOCALES[id].markers;
+  for (const locale of locales) {
+    const markers = LOCALES[locale].markers;
     if (!markers) continue;
-    const n = hits(text, markers);
-    if (n > bestHits) {
-      best = id;
-      bestHits = n;
+    const markerHits = countMarkerHits(text, markers);
+    if (markerHits > bestHits) {
+      best = locale;
+      bestHits = markerHits;
     }
   }
   return best;

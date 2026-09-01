@@ -25,34 +25,38 @@ const golden: Record<string, string> = {
 };
 
 /** Bytes outside replaced spans must equal the input, byte for byte (adr/0003). */
-const assertByteFidelity = (input: string, r: ScrubResult): void => {
-  let si = 0;
-  let so = 0;
-  for (const rep of r.replacements) {
-    expect(r.output.slice(so, rep.start)).toBe(input.slice(si, rep.sourceStart));
-    expect(r.output.slice(rep.start, rep.end)).toBe(rep.fake);
-    si = rep.sourceEnd;
-    so = rep.end;
+const assertByteFidelity = (input: string, scrubResult: ScrubResult): void => {
+  let sourceCursor = 0;
+  let outputCursor = 0;
+  for (const replacement of scrubResult.replacements) {
+    expect(scrubResult.output.slice(outputCursor, replacement.start)).toBe(
+      input.slice(sourceCursor, replacement.sourceStart),
+    );
+    expect(scrubResult.output.slice(replacement.start, replacement.end)).toBe(replacement.fake);
+    sourceCursor = replacement.sourceEnd;
+    outputCursor = replacement.end;
   }
-  expect(r.output.slice(so)).toBe(input.slice(si));
+  expect(scrubResult.output.slice(outputCursor)).toBe(input.slice(sourceCursor));
 };
 
 describe("scrub — golden outputs (default salt)", () => {
   for (const sample of samples) {
     it(`scrubs ${sample.name} to the committed golden`, async () => {
-      const r = await scrub(sample.input, { config });
-      expect(r.output).toBe(golden[sample.name]);
-      assertByteFidelity(sample.input, r);
+      const scrubResult = await scrub(sample.input, { config });
+      expect(scrubResult.output).toBe(golden[sample.name]);
+      assertByteFidelity(sample.input, scrubResult);
       // gold `catch` texts must not survive verbatim
-      for (const g of sample.gold) {
-        if (g.expect === "catch") expect(r.output).not.toContain(g.text);
+      for (const expectation of sample.gold) {
+        if (expectation.expect === "catch") {
+          expect(scrubResult.output).not.toContain(expectation.text);
+        }
       }
     });
   }
 
   it("keeps JSON parseable", async () => {
-    const r = await scrub(samples[0]!.input, { config });
-    expect(() => JSON.parse(r.output)).not.toThrow();
+    const scrubResult = await scrub(samples[0]!.input, { config });
+    expect(() => JSON.parse(scrubResult.output)).not.toThrow();
   });
 });
 
@@ -79,7 +83,7 @@ describe("scrub — consistency (same value ⇒ same fake)", () => {
     expect(a.replacements[0]!.fake).toBe(a.replacements[1]!.fake);
 
     const b = await scrub("mail jan.kowalski@gmail.com now", { config });
-    const emailFake = b.replacements.find((r) => r.type === "email")!.fake;
+    const emailFake = b.replacements.find((replacement) => replacement.type === "email")!.fake;
     expect(emailFake).toBe(a.replacements[0]!.fake);
   });
 });

@@ -33,8 +33,8 @@ export class SpanProcessor {
   prepareBatch(texts: string[], entities: string[]): ProcessorBatch {
     const [batchTokens, batchWordsStartIdx, batchWordsEndIdx] = this.tokenizeTexts(texts);
     const idToClass: Record<number, string> = {};
-    entities.forEach((entity, i) => {
-      idToClass[i + 1] = entity;
+    entities.forEach((entity, index) => {
+      idToClass[index + 1] = entity;
     });
     const [inputTokens, textLengths, promptLengths] = this.buildInputSequences(
       batchTokens,
@@ -160,17 +160,17 @@ export class SpanProcessor {
 }
 
 const padArrays = <T>(arrays: T[][], pad: T): T[][] => {
-  const maxLength = Math.max(...arrays.map((arr) => arr.length));
-  return arrays.map((arr) => [
-    ...arr,
-    ...Array.from({ length: maxLength - arr.length }, () => pad),
+  const maxLength = Math.max(...arrays.map((array) => array.length));
+  return arrays.map((array) => [
+    ...array,
+    ...Array.from({ length: maxLength - array.length }, () => pad),
   ]);
 };
 
 const padSpanArrays = (arrays: number[][][]): number[][][] => {
-  const maxLength = Math.max(...arrays.map((arr) => arr.length));
-  return arrays.map((arr) => [
-    ...arr,
-    ...Array.from({ length: maxLength - arr.length }, () => [0, 0]),
+  const maxLength = Math.max(...arrays.map((array) => array.length));
+  return arrays.map((array) => [
+    ...array,
+    ...Array.from({ length: maxLength - array.length }, () => [0, 0]),
   ]);
 };

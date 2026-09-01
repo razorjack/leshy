@@ -23,12 +23,14 @@ const DIGIT_TYPES: ReadonlySet<EntityType> = new Set([
 ]);
 
 export const normalise = (value: string, type: EntityType): string => {
-  const base = value.normalize("NFC").trim().replace(/\s+/g, " ");
+  const normalized = value.normalize("NFC").trim().replace(/\s+/g, " ");
   // person casefolds for the identity key but KEEPS diacritics — folding
   // `Łukasz`→`Lukasz` could link two distinct people (adr/0002).
-  if (type === "email" || type === "person") return base.toLowerCase();
-  if (DIGIT_TYPES.has(type)) return base.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
-  return base;
+  if (type === "email" || type === "person") return normalized.toLowerCase();
+  if (DIGIT_TYPES.has(type)) {
+    return normalized.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+  }
+  return normalized;
 };
 
 export const deriveSeed = async (
@@ -36,8 +38,8 @@ export const deriveSeed = async (
   scope: string,
   normalized: string,
 ): Promise<number> => {
-  const data = new TextEncoder().encode(`leshy:v1:${salt}:${scope}:${normalized}`);
-  const digest = await crypto.subtle.digest("SHA-256", data);
+  const seedInput = new TextEncoder().encode(`leshy:v1:${salt}:${scope}:${normalized}`);
+  const digest = await crypto.subtle.digest("SHA-256", seedInput);
   return new DataView(digest).getUint32(0, false);
 };
 
@@ -51,6 +53,8 @@ export const nameTokens = (value: string): string[] | null => {
     .normalize("NFC")
     .toLowerCase()
     .split(/[._+\-\s]+/);
-  const tokens = parts.map((p) => p.replace(/\d+/g, "")).filter((p) => /^\p{L}{2,}$/u.test(p));
+  const tokens = parts
+    .map((part) => part.replace(/\d+/g, ""))
+    .filter((part) => /^\p{L}{2,}$/u.test(part));
   return tokens.length > 0 ? tokens : null;
 };

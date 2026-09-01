@@ -6,8 +6,10 @@ import type { Replacement } from "../src/core/types.ts";
 
 const config = resolveConfig();
 
-const rebuild = (segs: ReturnType<typeof splitOutput>): string =>
-  segs.map((s) => (s.kind === "text" ? s.text : s.rep.fake)).join("");
+const rebuild = (segments: ReturnType<typeof splitOutput>): string =>
+  segments
+    .map((segment) => (segment.kind === "text" ? segment.text : segment.replacement.fake))
+    .join("");
 
 describe("splitOutput", () => {
   it("marks align with replacement ranges and reconstruct the output", async () => {
@@ -15,20 +17,22 @@ describe("splitOutput", () => {
       '{"email":"jan.kowalski@gmail.com","pesel":"44051401359"}',
       { config },
     );
-    const segs = splitOutput(output, replacements);
+    const segments = splitOutput(output, replacements);
     // every mark segment's fake sits exactly at its output range
-    for (const seg of segs) {
-      if (seg.kind === "mark") {
-        expect(output.slice(seg.rep.start, seg.rep.end)).toBe(seg.rep.fake);
+    for (const segment of segments) {
+      if (segment.kind === "mark") {
+        expect(output.slice(segment.replacement.start, segment.replacement.end)).toBe(
+          segment.replacement.fake,
+        );
       }
     }
-    expect(rebuild(segs)).toBe(output);
+    expect(rebuild(segments)).toBe(output);
   });
 
   it("stays aligned with multi-byte values (Łukasz)", () => {
     const output = 'name "Łukasz" here';
     const start = output.indexOf("Łukasz");
-    const rep: Replacement = {
+    const replacement: Replacement = {
       start,
       end: start + "Łukasz".length,
       sourceStart: 0,
@@ -38,10 +42,10 @@ describe("splitOutput", () => {
       detector: "person",
       label: "Person name",
     };
-    const segs = splitOutput(output, [rep]);
-    const mark = segs.find((s) => s.kind === "mark");
-    expect(mark && output.slice(mark.rep.start, mark.rep.end)).toBe("Łukasz");
-    expect(rebuild(segs)).toBe(output);
+    const segments = splitOutput(output, [replacement]);
+    const mark = segments.find((segment) => segment.kind === "mark");
+    expect(mark && output.slice(mark.replacement.start, mark.replacement.end)).toBe("Łukasz");
+    expect(rebuild(segments)).toBe(output);
   });
 
   it("returns a single text segment when there are no replacements", () => {
@@ -53,20 +57,21 @@ describe("splitInput", () => {
   it("marks cover the values the fakes replaced and reconstruct the input", async () => {
     const input = '{"email":"jan.kowalski@gmail.com","pesel":"44051401359"}';
     const { output, replacements } = await scrub(input, { config });
-    const segs = splitInput(input, replacements);
-    for (const seg of segs) {
-      if (seg.kind === "mark") {
-        expect(input.slice(seg.rep.sourceStart, seg.rep.sourceEnd)).toBe(seg.text);
+    const segments = splitInput(input, replacements);
+    for (const segment of segments) {
+      if (segment.kind === "mark") {
+        expect(input.slice(segment.replacement.sourceStart, segment.replacement.sourceEnd)).toBe(
+          segment.text,
+        );
       }
     }
-    expect(segs.map((s) => s.text).join("")).toBe(input);
-    expect(segs.filter((s) => s.kind === "mark").map((s) => s.text)).toEqual([
-      "jan.kowalski@gmail.com",
-      "44051401359",
-    ]);
+    expect(segments.map((segment) => segment.text).join("")).toBe(input);
+    expect(
+      segments.filter((segment) => segment.kind === "mark").map((segment) => segment.text),
+    ).toEqual(["jan.kowalski@gmail.com", "44051401359"]);
     // one mark per replacement, on both sides
-    expect(segs.filter((s) => s.kind === "mark")).toHaveLength(
-      splitOutput(output, replacements).filter((s) => s.kind === "mark").length,
+    expect(segments.filter((segment) => segment.kind === "mark")).toHaveLength(
+      splitOutput(output, replacements).filter((segment) => segment.kind === "mark").length,
     );
   });
 });

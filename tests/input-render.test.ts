@@ -4,7 +4,7 @@ import { session } from "../src/state/session.svelte.ts";
 import InputPane from "../src/lib/components/InputPane.svelte";
 import type { Replacement } from "../src/core/types.ts";
 
-const rep = (sourceStart: number, sourceEnd: number): Replacement => ({
+const replacement = (sourceStart: number, sourceEnd: number): Replacement => ({
   start: 0,
   end: 0,
   sourceStart,
@@ -23,7 +23,7 @@ const mirror = (): string => {
 };
 
 const marked = (): string[] =>
-  [...mirror().matchAll(/<mark[^>]*>([\s\S]*?)<\/mark>/g)].map((m) => m[1] ?? "");
+  [...mirror().matchAll(/<mark[^>]*>([\s\S]*?)<\/mark>/g)].map((match) => match[1] ?? "");
 
 const text = (): string => mirror().replace(/<[^>]+>/g, "");
 
@@ -31,7 +31,7 @@ describe("InputPane mirror", () => {
   it("marks the replaced values and repeats the input verbatim", () => {
     session.input = "user Jan Kowalski logged in";
     session.scrubbedFrom = session.input;
-    session.replacements = [rep(5, 17)];
+    session.replacements = [replacement(5, 17)];
     expect(marked()).toEqual(["Jan Kowalski"]);
     // the trailing newline is the empty last line every textarea keeps
     expect(text()).toBe(session.input + "\n");
@@ -40,14 +40,14 @@ describe("InputPane mirror", () => {
   it("keeps multi-byte values aligned", () => {
     session.input = "cześć Łukasz!";
     session.scrubbedFrom = session.input;
-    session.replacements = [rep(6, 12)];
+    session.replacements = [replacement(6, 12)];
     expect(marked()).toEqual(["Łukasz"]);
   });
 
   it("drops the marks once the input has moved past the scrub they came from", () => {
     session.input = "user Jan Kowalski logged in";
     session.scrubbedFrom = session.input;
-    session.replacements = [rep(5, 17)];
+    session.replacements = [replacement(5, 17)];
     session.input = "user Jan";
     expect(marked()).toEqual([]);
     expect(text()).toBe("user Jan\n");

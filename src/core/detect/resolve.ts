@@ -9,7 +9,8 @@ const SOURCE_TIER = {
   semantic: TIER.SEMANTIC,
 } as const;
 
-export const spanTier = (s: Span): number => (s.validated ? TIER.VALIDATED : SOURCE_TIER[s.source]);
+export const spanTier = (span: Span): number =>
+  span.validated ? TIER.VALIDATED : SOURCE_TIER[span.source];
 
 interface Range {
   start: number;
@@ -23,49 +24,54 @@ interface Range {
  * spans (a 460 KB log took ~30 s before this).
  */
 const sortMerged = (ranges: Range[]): Range[] => {
-  const out: Range[] = [];
-  for (const r of [...ranges].sort((a, b) => a.start - b.start)) {
-    const last = out[out.length - 1];
-    if (last !== undefined && r.start <= last.end) last.end = Math.max(last.end, r.end);
-    else out.push({ start: r.start, end: r.end });
+  const mergedRanges: Range[] = [];
+  const sortedRanges = [...ranges].sort((left, right) => left.start - right.start);
+
+  for (const range of sortedRanges) {
+    const lastRange = mergedRanges[mergedRanges.length - 1];
+    if (lastRange !== undefined && range.start <= lastRange.end) {
+      lastRange.end = Math.max(lastRange.end, range.end);
+    } else {
+      mergedRanges.push({ start: range.start, end: range.end });
+    }
   }
-  return out;
+  return mergedRanges;
 };
 
 /** Index of the first range ending after `pos` — the only one that can hit it. */
-const seek = (ranges: Range[], pos: number): number => {
-  let lo = 0;
-  let hi = ranges.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (ranges[mid]!.end <= pos) lo = mid + 1;
-    else hi = mid;
+const seek = (ranges: Range[], position: number): number => {
+  let lower = 0;
+  let upper = ranges.length;
+  while (lower < upper) {
+    const middle = (lower + upper) >> 1;
+    if (ranges[middle]!.end <= position) lower = middle + 1;
+    else upper = middle;
   }
-  return lo;
+  return lower;
 };
 
-const hits = (ranges: Range[], span: Range): boolean => {
-  const r = ranges[seek(ranges, span.start)];
-  return r !== undefined && r.start < span.end;
+const intersects = (ranges: Range[], span: Range): boolean => {
+  const candidate = ranges[seek(ranges, span.start)];
+  return candidate !== undefined && candidate.start < span.end;
 };
 
 /** `span` minus every range in `taken`, left to right. */
 const subtract = (taken: Range[], span: Range): Range[] => {
-  const out: Range[] = [];
+  const uncovered: Range[] = [];
   let cursor = span.start;
   for (let i = seek(taken, span.start); i < taken.length && taken[i]!.start < span.end; i++) {
-    const t = taken[i]!;
-    if (t.start > cursor) out.push({ start: cursor, end: t.start });
-    cursor = Math.max(cursor, t.end);
-    if (cursor >= span.end) return out;
+    const takenRange = taken[i]!;
+    if (takenRange.start > cursor) uncovered.push({ start: cursor, end: takenRange.start });
+    cursor = Math.max(cursor, takenRange.end);
+    if (cursor >= span.end) return uncovered;
   }
-  if (cursor < span.end) out.push({ start: cursor, end: span.end });
-  return out;
+  if (cursor < span.end) uncovered.push({ start: cursor, end: span.end });
+  return uncovered;
 };
 
 /** Insert a range known not to overlap anything already in `taken`. */
-const take = (taken: Range[], r: Range): void => {
-  taken.splice(seek(taken, r.start), 0, r);
+const take = (taken: Range[], range: Range): void => {
+  taken.splice(seek(taken, range.start), 0, range);
 };
 
 /**
@@ -88,54 +94,59 @@ const take = (taken: Range[], r: Range): void => {
 const GLUE = /^[\s\d,/.·-]{0,6}$/;
 const FRAGMENTED = new Set(["address", "person", "org"]);
 
-const merge = (a: Span, b: Span, input: string): Span => {
-  const winner = spanTier(b) > spanTier(a) ? b : a;
-  const start = winner.validated ? winner.start : a.start;
-  const end = winner.validated ? winner.end : Math.max(a.end, b.end);
+const merge = (previous: Span, current: Span, input: string): Span => {
+  const winner = spanTier(current) > spanTier(previous) ? current : previous;
+  const start = winner.validated ? winner.start : previous.start;
+  const end = winner.validated ? winner.end : Math.max(previous.end, current.end);
   return {
     start,
     end,
     text: input.slice(start, end),
-    type: a.type,
+    type: previous.type,
     detector: winner.detector,
     source: winner.source,
-    score: Math.max(a.score, b.score),
+    score: Math.max(previous.score, current.score),
     validated: winner.validated,
   };
 };
 
 const mergeAdjacent = (spans: Span[], input: string): Span[] => {
-  const out: Span[] = [];
-  for (const s of [...spans].sort((a, b) => a.start - b.start)) {
-    const prev = out[out.length - 1];
-    // sorted by start, so prev.start <= s.start: overlap reduces to this
-    const overlapping = prev !== undefined && s.start < prev.end;
+  const mergedSpans: Span[] = [];
+  const sortedSpans = [...spans].sort((left, right) => left.start - right.start);
+
+  for (const span of sortedSpans) {
+    const previous = mergedSpans[mergedSpans.length - 1];
+    // Sorted by start, so previous.start <= span.start: overlap reduces to this.
+    const overlapping = previous !== undefined && span.start < previous.end;
     const glued =
-      prev !== undefined &&
-      FRAGMENTED.has(s.type) &&
-      s.start >= prev.end &&
-      GLUE.test(input.slice(prev.end, s.start));
-    if (prev !== undefined && prev.type === s.type && (overlapping || glued)) {
-      out[out.length - 1] = merge(prev, s, input);
+      previous !== undefined &&
+      FRAGMENTED.has(span.type) &&
+      span.start >= previous.end &&
+      GLUE.test(input.slice(previous.end, span.start));
+
+    if (previous !== undefined && previous.type === span.type && (overlapping || glued)) {
+      mergedSpans[mergedSpans.length - 1] = merge(previous, span, input);
     } else {
-      out.push(s);
+      mergedSpans.push(span);
     }
   }
-  return out;
+  return mergedSpans;
 };
 
 /** Value ranges under keys a preserve rule names (optionally shape-checked). */
-const preservedRanges = (rules: PreserveRule[], kvs: KeyValue[]): Range[] => {
-  const out: Range[] = [];
-  for (const rule of rules) {
+const preservedRanges = (preserveRules: PreserveRule[], keyValues: KeyValue[]): Range[] => {
+  const ranges: Range[] = [];
+  for (const rule of preserveRules) {
     if (!rule.keys) continue;
-    for (const kv of kvs) {
-      if (rule.keys.test(kv.key) && (!rule.match || rule.match.test(kv.value))) {
-        out.push({ start: kv.valueStart, end: kv.valueEnd });
+    for (const keyValue of keyValues) {
+      const keyMatches = rule.keys.test(keyValue.key);
+      const valueMatches = !rule.match || rule.match.test(keyValue.value);
+      if (keyMatches && valueMatches) {
+        ranges.push({ start: keyValue.valueStart, end: keyValue.valueEnd });
       }
     }
   }
-  return sortMerged(out);
+  return sortMerged(ranges);
 };
 
 /**
@@ -152,18 +163,23 @@ const dropSemanticNoise = (
   input: string,
 ): Span[] => {
   const semanticTypes = new Set(
-    detectors.filter((d) => d.enabled && d.kind === "semantic").map((d) => d.type),
-  );
-  const corroborated = new Set(
     detectors
-      .filter((d) => d.enabled && d.kind !== "semantic" && !semanticTypes.has(d.type))
-      .map((d) => d.type),
+      .filter((detector) => detector.enabled && detector.kind === "semantic")
+      .map((detector) => detector.type),
+  );
+  const corroboratedTypes = new Set(
+    detectors
+      .filter(
+        (detector) =>
+          detector.enabled && detector.kind !== "semantic" && !semanticTypes.has(detector.type),
+      )
+      .map((detector) => detector.type),
   );
   const structuralRegions = sortMerged(structural);
-  return semantic.filter((s) => {
-    if (TIMESTAMP.test(s.text) || /^\d+$/.test(s.text)) return false;
-    if (/^["']?\s*(?::|=>|=)/.test(input.slice(s.end, s.end + 5))) return false;
-    if (corroborated.has(s.type)) return hits(structuralRegions, s);
+  return semantic.filter((span) => {
+    if (TIMESTAMP.test(span.text) || /^\d+$/.test(span.text)) return false;
+    if (/^["']?\s*(?::|=>|=)/.test(input.slice(span.end, span.end + 5))) return false;
+    if (corroboratedTypes.has(span.type)) return intersects(structuralRegions, span);
     return true;
   });
 };
@@ -174,9 +190,10 @@ const dropSemanticNoise = (
  * no-op even when the model tags a fragment of a fake (a fake email's local
  * part reads as a person/org). This is what makes idempotence hold (adr/0002).
  */
-const dropFakes = (spans: Span[], rules: PreserveRule[]): Span[] => {
-  const fakeRegions = sortMerged(spans.filter((s) => rules.some((r) => r.isFake?.(s.text))));
-  return spans.filter((s) => !hits(fakeRegions, s));
+const dropFakes = (spans: Span[], preserveRules: PreserveRule[]): Span[] => {
+  const fakeSpans = spans.filter((span) => preserveRules.some((rule) => rule.isFake?.(span.text)));
+  const fakeRegions = sortMerged(fakeSpans);
+  return spans.filter((span) => !intersects(fakeRegions, span));
 };
 
 /**
@@ -186,17 +203,25 @@ const dropFakes = (spans: Span[], rules: PreserveRule[]): Span[] => {
  */
 const applyKeep = (spans: Span[], keep: string[]): Span[] => {
   if (keep.length === 0) return spans;
-  const kept = new Set(keep);
-  const regions = sortMerged(spans.filter((s) => kept.has(s.text)));
-  return spans.filter((s) => !hits(regions, s));
+  const keptValues = new Set(keep);
+  const keptRegions = sortMerged(spans.filter((span) => keptValues.has(span.text)));
+  return spans.filter((span) => !intersects(keptRegions, span));
 };
 
 /** Preserve rules beat everything below TIER.VALIDATED. */
-const applyPreserve = (spans: Span[], rules: PreserveRule[], kvs: KeyValue[]): Span[] => {
-  const regions = preservedRanges(rules, kvs);
-  const shapes = rules.filter((r) => !r.keys && r.match);
-  const shaped = (s: Span): boolean => shapes.some((r) => r.match?.test(s.text));
-  return spans.filter((s) => spanTier(s) >= TIER.VALIDATED || !(hits(regions, s) || shaped(s)));
+const applyPreserve = (
+  spans: Span[],
+  preserveRules: PreserveRule[],
+  keyValues: KeyValue[],
+): Span[] => {
+  const keyRegions = preservedRanges(preserveRules, keyValues);
+  const shapeRules = preserveRules.filter((rule) => !rule.keys && rule.match);
+
+  return spans.filter((span) => {
+    if (spanTier(span) >= TIER.VALIDATED) return true;
+    const matchesShape = shapeRules.some((rule) => rule.match?.test(span.text));
+    return !intersects(keyRegions, span) && !matchesShape;
+  });
 };
 
 /**
@@ -205,26 +230,27 @@ const applyPreserve = (spans: Span[], rules: PreserveRule[], kvs: KeyValue[]): S
  * A remainder with no letter or digit in it is not worth a fake.
  */
 const settleOverlaps = (spans: Span[], detectors: Detector[], input: string): Span[] => {
-  const order = new Map(detectors.map((d, i) => [d.id, i]));
-  const rank = (s: Span): number => order.get(s.detector) ?? detectors.length;
+  const detectorOrder = new Map(detectors.map((detector, index) => [detector.id, index]));
+  const detectorRank = (span: Span): number => detectorOrder.get(span.detector) ?? detectors.length;
   const sorted = [...spans].sort(
-    (a, b) =>
-      spanTier(b) - spanTier(a) ||
-      b.end - b.start - (a.end - a.start) ||
-      rank(a) - rank(b) ||
-      a.start - b.start,
+    (left, right) =>
+      spanTier(right) - spanTier(left) ||
+      right.end - right.start - (left.end - left.start) ||
+      detectorRank(left) - detectorRank(right) ||
+      left.start - right.start,
   );
   const chosen: Span[] = [];
   const taken: Range[] = [];
-  for (const s of sorted) {
-    for (const p of subtract(taken, s)) {
-      const text = input.slice(p.start, p.end);
+
+  for (const span of sorted) {
+    for (const remainder of subtract(taken, span)) {
+      const text = input.slice(remainder.start, remainder.end);
       if (!/[\p{L}\p{N}]/u.test(text)) continue;
-      chosen.push({ ...s, start: p.start, end: p.end, text });
-      take(taken, p);
+      chosen.push({ ...span, start: remainder.start, end: remainder.end, text });
+      take(taken, remainder);
     }
   }
-  return chosen.sort((a, b) => a.start - b.start);
+  return chosen.sort((left, right) => left.start - right.start);
 };
 
 /**
@@ -232,22 +258,26 @@ const settleOverlaps = (spans: Span[], detectors: Detector[], input: string): Sp
  * list ready for substitution. Validated in the spike (scripts/spike).
  */
 export const resolve = (
-  rawSpans: Span[],
+  detectedSpans: Span[],
   input: string,
   detectors: Detector[],
   preserve: PreserveRule[],
-  kvs?: KeyValue[],
+  scannedKeyValues?: KeyValue[],
   keep: string[] = [],
 ): Span[] => {
-  const keyValues = kvs ?? scanKeyValues(input);
-  const rules = preserve.filter((r) => r.enabled);
-  const bySource = (source: Span["source"]): Span[] => rawSpans.filter((s) => s.source === source);
-  const structural = bySource("structural");
-  const semantic = dropSemanticNoise(bySource("semantic"), structural, detectors, input);
+  const keyValues = scannedKeyValues ?? scanKeyValues(input);
+  const preserveRules = preserve.filter((rule) => rule.enabled);
+  const spansFrom = (source: Span["source"]): Span[] =>
+    detectedSpans.filter((span) => span.source === source);
 
-  let spans = mergeAdjacent([...structural, ...bySource("key-context"), ...semantic], input);
-  spans = dropFakes(spans, rules);
-  spans = applyPreserve(spans, rules, keyValues);
-  spans = applyKeep(spans, keep);
-  return settleOverlaps(spans, detectors, input);
+  const structuralSpans = spansFrom("structural");
+  const keySpans = spansFrom("key-context");
+  const semanticSpans = dropSemanticNoise(spansFrom("semantic"), structuralSpans, detectors, input);
+
+  let resolvedSpans = mergeAdjacent([...structuralSpans, ...keySpans, ...semanticSpans], input);
+  resolvedSpans = dropFakes(resolvedSpans, preserveRules);
+  resolvedSpans = applyPreserve(resolvedSpans, preserveRules, keyValues);
+  resolvedSpans = applyKeep(resolvedSpans, keep);
+
+  return settleOverlaps(resolvedSpans, detectors, input);
 };

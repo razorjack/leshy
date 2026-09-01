@@ -13,20 +13,38 @@ const OVERLAP_WORDS = 40;
 
 const splitter = new WordSplitter();
 
+interface WordWindow {
+  start: number;
+  end: number;
+}
+
 /** Char ranges of ~CHUNK_WORDS-word windows over the input, OVERLAP_WORDS-shared. */
-const windows = (input: string): Array<{ start: number; end: number }> => {
+const windows = (input: string): WordWindow[] => {
   const words = Array.from(splitter.split(input), ([, start, end]) => ({ start, end }));
   if (words.length === 0) return [];
   if (words.length <= CHUNK_WORDS) return [{ start: 0, end: input.length }];
 
   const step = CHUNK_WORDS - OVERLAP_WORDS;
-  const out: Array<{ start: number; end: number }> = [];
+  const wordWindows: WordWindow[] = [];
   for (let i = 0; i < words.length; i += step) {
-    const slice = words.slice(i, i + CHUNK_WORDS);
-    out.push({ start: slice[0]!.start, end: slice[slice.length - 1]!.end });
+    const windowWords = words.slice(i, i + CHUNK_WORDS);
+    wordWindows.push({
+      start: windowWords[0]!.start,
+      end: windowWords[windowWords.length - 1]!.end,
+    });
     if (i + CHUNK_WORDS >= words.length) break;
   }
-  return out;
+  return wordWindows;
+};
+
+const collectLabelOwners = (detectors: SemanticDetector[]): Map<string, SemanticDetector> => {
+  const labelOwners = new Map<string, SemanticDetector>();
+  for (const detector of detectors) {
+    for (const label of detector.labels) {
+      if (!labelOwners.has(label)) labelOwners.set(label, detector);
+    }
+  }
+  return labelOwners;
 };
 
 /**
@@ -43,44 +61,43 @@ export const detectSemantic = async (
   gliner: Gliner,
   defaultThreshold: number,
 ): Promise<Span[]> => {
-  const semantic = detectors.filter(
-    (d): d is SemanticDetector => d.kind === "semantic" && d.enabled,
+  const semanticDetectors = detectors.filter(
+    (detector): detector is SemanticDetector => detector.kind === "semantic" && detector.enabled,
   );
-  if (semantic.length === 0 || input.trim() === "") return [];
+  if (semanticDetectors.length === 0 || input.trim() === "") return [];
 
-  const labelOwner = new Map<string, SemanticDetector>();
-  for (const d of semantic) {
-    for (const label of d.labels) {
-      if (!labelOwner.has(label)) labelOwner.set(label, d);
-    }
-  }
-  const thresholds = semantic.map((d) => d.threshold ?? defaultThreshold);
-  const floor = Math.min(...thresholds);
-  const labels = [...labelOwner.keys()];
+  const labelOwners = collectLabelOwners(semanticDetectors);
+  const thresholds = semanticDetectors.map((detector) => detector.threshold ?? defaultThreshold);
+  const modelThreshold = Math.min(...thresholds);
+  const labels = [...labelOwners.keys()];
 
-  const byKey = new Map<string, Span>();
-  for (const w of windows(input)) {
-    const entities = await gliner.extractEntities(input.slice(w.start, w.end), labels, {
-      threshold: floor,
+  const spansByPosition = new Map<string, Span>();
+  for (const window of windows(input)) {
+    const windowText = input.slice(window.start, window.end);
+    const entities = await gliner.extractEntities(windowText, labels, {
+      threshold: modelThreshold,
     });
-    for (const e of entities) {
-      const owner = labelOwner.get(e.label);
-      if (!owner || e.score < (owner.threshold ?? defaultThreshold)) continue;
-      const start = e.start + w.start;
-      const end = e.end + w.start;
-      const key = `${start}:${end}:${owner.id}`;
-      const prev = byKey.get(key);
-      if (prev && prev.score >= e.score) continue;
-      byKey.set(key, {
+    for (const entity of entities) {
+      const detector = labelOwners.get(entity.label);
+      if (!detector) continue;
+      if (entity.score < (detector.threshold ?? defaultThreshold)) continue;
+
+      const start = entity.start + window.start;
+      const end = entity.end + window.start;
+      const positionKey = `${start}:${end}:${detector.id}`;
+      const previousSpan = spansByPosition.get(positionKey);
+      if (previousSpan && previousSpan.score >= entity.score) continue;
+
+      spansByPosition.set(positionKey, {
         start,
         end,
         text: input.slice(start, end),
-        type: owner.type,
-        detector: owner.id,
+        type: detector.type,
+        detector: detector.id,
         source: "semantic",
-        score: e.score,
+        score: entity.score,
       });
     }
   }
-  return [...byKey.values()];
+  return [...spansByPosition.values()];
 };

@@ -9,8 +9,8 @@ import { app, BrowserWindow, nativeTheme, net, protocol, session } from "electro
 
 const HOST = "leshy";
 const ORIGIN = `app://${HOST}`;
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "dist");
-const icon = path.join(root, "icons", "icon-512.png");
+const appRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "dist");
+const icon = path.join(appRoot, "icons", "icon-512.png");
 
 // Mirrors the meta CSP in index.html. Serving it as a header too is the
 // defence in depth architecture.md asks for; keep the two identical.
@@ -61,15 +61,16 @@ protocol.registerSchemesAsPrivileged([
 const serve = async (request: Request): Promise<Response> => {
   const url = new URL(request.url);
   if (url.host !== HOST) return new Response("not found", { status: 404 });
-  const rel = path.normalize(decodeURIComponent(url.pathname));
-  const file = rel === path.sep ? path.join(root, "index.html") : path.join(root, rel);
-  if (file !== root && !file.startsWith(root + path.sep)) {
+  const relativePath = path.normalize(decodeURIComponent(url.pathname));
+  const file =
+    relativePath === path.sep ? path.join(appRoot, "index.html") : path.join(appRoot, relativePath);
+  if (file !== appRoot && !file.startsWith(appRoot + path.sep)) {
     return new Response("forbidden", { status: 403 });
   }
   try {
-    const res = await net.fetch(pathToFileURL(file).toString());
-    if (!res.ok) return new Response("not found", { status: res.status });
-    return new Response(res.body, { status: 200, headers: headersFor(file) });
+    const fileResponse = await net.fetch(pathToFileURL(file).toString());
+    if (!fileResponse.ok) return new Response("not found", { status: fileResponse.status });
+    return new Response(fileResponse.body, { status: 200, headers: headersFor(file) });
   } catch {
     return new Response("not found", { status: 404 });
   }
@@ -78,22 +79,22 @@ const serve = async (request: Request): Promise<Response> => {
 // Invariant #1 as an enforced boundary rather than a promise: the renderer has
 // no route to the network at all, even if the CSP were wrong.
 const lockDown = (): void => {
-  const s = session.defaultSession;
-  s.webRequest.onBeforeRequest({ urls: ["*://*/*"] }, (_details, callback) => {
+  const defaultSession = session.defaultSession;
+  defaultSession.webRequest.onBeforeRequest({ urls: ["*://*/*"] }, (_details, callback) => {
     callback({ cancel: true });
   });
   const allowed = new Set(["clipboard-read", "clipboard-sanitized-write"]);
-  s.setPermissionRequestHandler((_contents, permission, callback) => {
+  defaultSession.setPermissionRequestHandler((_contents, permission, callback) => {
     callback(allowed.has(permission));
   });
-  s.setPermissionCheckHandler((_contents, permission) => allowed.has(permission));
+  defaultSession.setPermissionCheckHandler((_contents, permission) => allowed.has(permission));
 };
 
 // Matches --background in src/app.css so the window does not flash before paint.
 const background = (): string => (nativeTheme.shouldUseDarkColors ? "#07110c" : "#f7f6f0");
 
 const createWindow = (): BrowserWindow => {
-  const win = new BrowserWindow({
+  const window = new BrowserWindow({
     width: 1100,
     height: 820,
     minWidth: 560,
@@ -111,19 +112,19 @@ const createWindow = (): BrowserWindow => {
       spellcheck: false,
     },
   });
-  win.once("ready-to-show", () => win.show());
-  void win.loadURL(`${ORIGIN}/`);
-  return win;
+  window.once("ready-to-show", () => window.show());
+  void window.loadURL(`${ORIGIN}/`);
+  return window;
 };
 
 // LESHY_SMOKE=1 launches, reports what the renderer actually got, and exits.
 // Cheap check that the custom origin still carries isolation and WebGPU, and
 // that the 172 MB weights still stream through protocol.handle intact.
 const SMOKE = `(async () => {
-  const head = async (p) => {
-    const r = await fetch(p);
-    const b = await r.arrayBuffer();
-    return { bytes: b.byteLength, type: r.headers.get('content-type') };
+  const head = async (path) => {
+    const response = await fetch(path);
+    const body = await response.arrayBuffer();
+    return { bytes: body.byteLength, type: response.headers.get('content-type') };
   };
   return {
     origin: location.origin,
@@ -135,8 +136,8 @@ const SMOKE = `(async () => {
   };
 })()`;
 
-const smokeTest = async (win: BrowserWindow): Promise<void> => {
-  const report = (await win.webContents.executeJavaScript(SMOKE)) as Record<string, unknown>;
+const smokeTest = async (window: BrowserWindow): Promise<void> => {
+  const report = (await window.webContents.executeJavaScript(SMOKE)) as Record<string, unknown>;
   console.log("leshy shell:", JSON.stringify(report));
   app.quit();
 };
@@ -147,10 +148,10 @@ if (!app.requestSingleInstanceLock()) {
   app.setName("Leshy");
 
   app.on("second-instance", () => {
-    const [win] = BrowserWindow.getAllWindows();
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.focus();
+    const [window] = BrowserWindow.getAllWindows();
+    if (window) {
+      if (window.isMinimized()) window.restore();
+      window.focus();
     }
   });
 
@@ -169,12 +170,12 @@ if (!app.requestSingleInstanceLock()) {
     protocol.handle("app", serve);
     lockDown();
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(icon);
-    const win = createWindow();
+    const window = createWindow();
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
     if (process.env["LESHY_SMOKE"] === "1") {
-      win.webContents.once("did-finish-load", () => void smokeTest(win));
+      window.webContents.once("did-finish-load", () => void smokeTest(window));
     }
   });
 }

@@ -17,14 +17,14 @@ import { loadGlinerNode } from "./gliner-node.ts";
 // Usage: npm run models:fetch && npm run spike [-- <model-id>]
 
 const modelId = process.argv[2] ?? DEFAULT_MODEL;
-const spec = models[modelId];
-if (!spec) {
+const model = models[modelId];
+if (!model) {
   console.error(`unknown model '${modelId}' — known: ${Object.keys(models).join(", ")}`);
   process.exit(1);
 }
-const weights = path.join("public", "models", spec.id, spec.files.weights);
+const weights = path.join("public", "models", model.id, model.files.weights);
 if (!existsSync(weights)) {
-  console.error(`missing ${weights} — run: npm run models:fetch -- ${spec.id}`);
+  console.error(`missing ${weights} — run: npm run models:fetch -- ${model.id}`);
   process.exit(1);
 }
 
@@ -38,10 +38,10 @@ for (const sample of samples) {
   noModel = addScores(noModel, evaluateSample(sample, spans, true));
 }
 
-console.log(`\n=== full pipeline: + ${spec.id} @ threshold ${config.semantic.threshold} ===`);
-const t0 = performance.now();
+console.log(`\n=== full pipeline: + ${model.id} @ threshold ${config.semantic.threshold} ===`);
+const loadStartedAt = performance.now();
 const gliner = await loadGlinerNode(modelId);
-console.log(`(model loaded in ${((performance.now() - t0) / 1000).toFixed(1)}s)`);
+console.log(`(model loaded in ${((performance.now() - loadStartedAt) / 1000).toFixed(1)}s)`);
 
 const semantic = (input: string): ReturnType<typeof detectSemantic> =>
   detectSemantic(input, config.detectors, gliner, config.semantic.threshold);
@@ -49,15 +49,15 @@ const semantic = (input: string): ReturnType<typeof detectSemantic> =>
 let full = zero;
 let totalMs = 0;
 for (const sample of [...samples, ...hardSamples]) {
-  const t1 = performance.now();
+  const detectionStartedAt = performance.now();
   const spans = await detect(sample.input, { config, semantic });
-  totalMs += performance.now() - t1;
+  totalMs += performance.now() - detectionStartedAt;
   full = addScores(full, evaluateSample(sample, spans, true));
 }
 
 const goldCount = [...samples, ...hardSamples]
-  .flatMap((s) => s.gold)
-  .filter((g) => g.expect === "catch").length;
+  .flatMap((sample) => sample.gold)
+  .filter((expectation) => expectation.expect === "catch").length;
 console.log(
   `\nno-model:  full=${noModel.full} partial=${noModel.partial} miss=${noModel.miss} preserve-violations=${noModel.preserveViolations}`,
 );
@@ -71,14 +71,14 @@ console.log(
 console.log("\n=== scrub pass (full pipeline) ===");
 let scrubFail = 0;
 for (const sample of [...samples, ...hardSamples]) {
-  const r = await scrub(sample.input, { config, semantic });
-  for (const g of sample.gold) {
-    if (g.expect === "catch" && r.output.includes(g.text)) {
-      console.log(`  [LEAK    ] ${sample.name}: "${g.text}" survived scrub`);
+  const scrubResult = await scrub(sample.input, { config, semantic });
+  for (const expectation of sample.gold) {
+    if (expectation.expect === "catch" && scrubResult.output.includes(expectation.text)) {
+      console.log(`  [LEAK    ] ${sample.name}: "${expectation.text}" survived scrub`);
       scrubFail++;
     }
-    if (g.expect === "preserve" && !r.output.includes(g.text)) {
-      console.log(`  [PRESERVE] ${sample.name}: "${g.text}" did not survive`);
+    if (expectation.expect === "preserve" && !scrubResult.output.includes(expectation.text)) {
+      console.log(`  [PRESERVE] ${sample.name}: "${expectation.text}" did not survive`);
       scrubFail++;
     }
   }
@@ -110,9 +110,9 @@ console.log(
 // seam, the middle and the end — every occurrence must be caught and scrubbed.
 console.log("\n=== chunking (5k-word input) ===");
 const words = "the transaction was processed ".repeat(1250).trim().split(" ");
-for (const p of [3, 249, 2500, 4990]) {
-  words[p] = "Jan";
-  words[p + 1] = "Kowalski";
+for (const position of [3, 249, 2500, 4990]) {
+  words[position] = "Jan";
+  words[position + 1] = "Kowalski";
 }
 const bigLog = words.join(" ");
 const expected = (bigLog.match(/Jan Kowalski/g) ?? []).length;

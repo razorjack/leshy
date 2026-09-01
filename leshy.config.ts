@@ -19,7 +19,7 @@ import { defineConfig } from "./src/core/config.ts";
  *         match: /(?<!\d)\d{10}(?!\d)/g,
  *         keys: /^nip$/i,
  *         validate: (nip) => nipChecksum(nip),
- *         generate: (ctx) => fakeNip(ctx.seed),
+ *         generate: (context) => fakeNip(context.seed),
  *       },
  *     ],
  *     preserve: [{ id: 'build-hashes', keys: /^commit|sha$/i, enabled: true }],

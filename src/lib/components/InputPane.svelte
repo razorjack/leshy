@@ -40,17 +40,17 @@
 
 <!-- Dropping anywhere on the page opens the file: the target is the app, not a box. -->
 <svelte:window
-  ondragover={(e) => {
-    e.preventDefault()
+  ondragover={(event) => {
+    event.preventDefault()
     dragging = true
   }}
-  ondragleave={(e) => {
-    if (e.relatedTarget === null) dragging = false
+  ondragleave={(event) => {
+    if (event.relatedTarget === null) dragging = false
   }}
-  ondrop={(e) => {
-    e.preventDefault()
+  ondrop={(event) => {
+    event.preventDefault()
     dragging = false
-    openFiles(e.dataTransfer?.files)
+    openFiles(event.dataTransfer?.files)
   }}
 />
 
@@ -70,9 +70,9 @@
       bind:this={picker}
       type="file"
       class="hidden"
-      onchange={(e) => {
-        openFiles(e.currentTarget.files)
-        e.currentTarget.value = ''
+      onchange={(event) => {
+        openFiles(event.currentTarget.files)
+        event.currentTarget.value = ''
       }}
     />
   </div>
@@ -90,9 +90,9 @@
       bind:this={mirror}
       aria-hidden="true"
       class="pointer-events-none absolute inset-0 overflow-x-hidden overflow-y-scroll whitespace-pre-wrap break-words p-6 font-mono text-sm text-transparent"
-      >{#each segments as seg}{#if seg.kind === 'text'}{seg.text}{:else}<mark
-            class="{markClass(seg.rep.type)} box-decoration-clone rounded-xs bg-mark text-transparent underline decoration-mark-border decoration-dotted underline-offset-2"
-            >{seg.text}</mark
+      >{#each segments as segment}{#if segment.kind === 'text'}{segment.text}{:else}<mark
+            class="{markClass(segment.replacement.type)} box-decoration-clone rounded-xs bg-mark text-transparent underline decoration-mark-border decoration-dotted underline-offset-2"
+            >{segment.text}</mark
           >{/if}{/each}{'\n'}</div>
     <!--
       Nothing but Leshy may read what is pasted here (invariant 1). CSP does not
@@ -115,8 +115,8 @@
       value={session.input}
       onscroll={sync}
       onpaste={() => (pasted = true)}
-      oninput={(e) => {
-        session.setInput(e.currentTarget.value, pasted)
+      oninput={(event) => {
+        session.setInput(event.currentTarget.value, pasted)
         pasted = false
       }}
     ></textarea>

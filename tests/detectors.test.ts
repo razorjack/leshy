@@ -9,40 +9,44 @@ import { scrub } from "../src/core/engine.ts";
 const all = resolveConfig().detectors;
 
 const types = (input: string, detectors = all): string[] =>
-  [...new Set(detectStructural(input, detectors).map((s) => s.type))].sort();
+  [...new Set(detectStructural(input, detectors).map((span) => span.type))].sort();
 
 describe("structural detectors", () => {
   it("leaves loopback addresses alone", async () => {
     const doc = "listening on ::1 and 127.0.0.1, peer 10.0.0.5";
-    const r = await scrub(doc, { config: resolveConfig() });
-    expect(r.output).toContain("::1 and 127.0.0.1");
-    expect(r.output).not.toContain("10.0.0.5");
+    const scrubResult = await scrub(doc, { config: resolveConfig() });
+    expect(scrubResult.output).toContain("::1 and 127.0.0.1");
+    expect(scrubResult.output).not.toContain("10.0.0.5");
   });
 
   it("leaves the host of a URL with credentials readable", async () => {
-    const r = await scrub("upstream=postgres://appuser:tr0ub4dor@db.internal:5432/app", {
+    const scrubResult = await scrub("upstream=postgres://appuser:tr0ub4dor@db.internal:5432/app", {
       config: resolveConfig(),
     });
-    expect(r.output).toMatch(/^upstream=postgres:\/\/[^\s@:]+:[^\s@:]+@db\.internal:5432\/app$/);
-    expect(r.output).not.toContain("tr0ub4dor");
-    expect(r.output).not.toContain("appuser");
+    expect(scrubResult.output).toMatch(
+      /^upstream=postgres:\/\/[^\s@:]+:[^\s@:]+@db\.internal:5432\/app$/,
+    );
+    expect(scrubResult.output).not.toContain("tr0ub4dor");
+    expect(scrubResult.output).not.toContain("appuser");
   });
 
   it("redacts a prefixed API key even under an id-like key", async () => {
-    const r = await scrub("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE", { config: resolveConfig() });
-    expect(r.output).not.toContain("AKIAIOSFODNN7EXAMPLE");
-    expect(r.output).toMatch(/^AWS_ACCESS_KEY_ID=AKIA[0-9A-Z]{16}$/);
+    const scrubResult = await scrub("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE", {
+      config: resolveConfig(),
+    });
+    expect(scrubResult.output).not.toContain("AKIAIOSFODNN7EXAMPLE");
+    expect(scrubResult.output).toMatch(/^AWS_ACCESS_KEY_ID=AKIA[0-9A-Z]{16}$/);
   });
 
   it("spans the secret path of a Slack or Discord webhook, keeps the host", async () => {
     const doc =
       "notify https://hooks.slack.com/services/T0000000000/B0000000000/XXXXXXXXXXXXXXXXXXXXXXXX and https://discord.com/api/webhooks/123456789012345678/abcDEF-ghiJKL_mnoPQR123456789";
-    const r = await scrub(doc, { config: resolveConfig() });
-    expect(r.output).toMatch(
+    const scrubResult = await scrub(doc, { config: resolveConfig() });
+    expect(scrubResult.output).toMatch(
       /^notify https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9/]+ and https:\/\/discord\.com\/api\/webhooks\/[A-Za-z0-9/_-]+$/,
     );
-    expect(r.output).not.toContain("B0000000000");
-    expect(r.output).not.toContain("123456789012345678");
+    expect(scrubResult.output).not.toContain("B0000000000");
+    expect(scrubResult.output).not.toContain("123456789012345678");
   });
 
   it("catches an AWS secret access key but not a 40-char hex digest", () => {
@@ -54,13 +58,13 @@ describe("structural detectors", () => {
 
   it("fakes hostnames under host keys, keeps the port and localhost", async () => {
     const doc = "db_host=pg-1.prod.corp.internal:5432 redis_host=localhost:6379 host=10.0.0.5";
-    const r = await scrub(doc, { config: resolveConfig() });
-    expect(r.output).toMatch(
+    const scrubResult = await scrub(doc, { config: resolveConfig() });
+    expect(scrubResult.output).toMatch(
       /^db_host=[a-z0-9-]+\.[a-z0-9-]+\.[a-z0-9-]+\.example:5432 redis_host=localhost:6379 host=10\.\d+\.\d+\.\d+$/,
     );
     // the fake hostname is in the reserved namespace, so a second pass keeps it
-    const again = await scrub(r.output, { config: resolveConfig() });
-    expect(again.output.split(" host=")[0]).toBe(r.output.split(" host=")[0]);
+    const again = await scrub(scrubResult.output, { config: resolveConfig() });
+    expect(again.output.split(" host=")[0]).toBe(scrubResult.output.split(" host=")[0]);
   });
 
   it("matches emails", () => {
@@ -153,8 +157,12 @@ describe("de pack", () => {
 
   it("generates a fake outside both the German and the Polish namespace", async () => {
     for (const src of ["86095742719", "47036892816", "25768131411"]) {
-      const ctx = await makeContext(src, "steuer-id", "leshy-v1");
-      const fake = steuerId.generate(ctx);
+      const context = await makeContext({
+        original: src,
+        type: "steuer-id",
+        salt: "leshy-v1",
+      });
+      const fake = steuerId.generate(context);
       expect(fake).toMatch(/^0\d{10}$/);
       expect(isSteuerId(fake)).toBe(false);
       expect(peselChecksum(fake) && Number(fake.slice(2, 4)) <= 12).toBe(false);
@@ -250,12 +258,12 @@ describe("country packs", () => {
   });
 
   it("take their fake-namespace preserve rules with them", () => {
-    const ids = (c: Parameters<typeof resolveConfig>[0]): string[] =>
-      resolveConfig(c).preserve.map((r) => r.id);
-    expect(ids({})).toContain("fake-pesel");
-    expect(ids({ countries: ["us"] })).not.toContain("fake-pesel");
-    expect(ids({ countries: ["us"] })).toContain("fake-ssn");
-    expect(ids({ countries: [] })).toContain("fake-email");
+    const preserveIds = (config: Parameters<typeof resolveConfig>[0]): string[] =>
+      resolveConfig(config).preserve.map((rule) => rule.id);
+    expect(preserveIds({})).toContain("fake-pesel");
+    expect(preserveIds({ countries: ["us"] })).not.toContain("fake-pesel");
+    expect(preserveIds({ countries: ["us"] })).toContain("fake-ssn");
+    expect(preserveIds({ countries: [] })).toContain("fake-email");
   });
 
   it("leave the country-neutral detectors alone", () => {

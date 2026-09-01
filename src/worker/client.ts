@@ -13,7 +13,7 @@ export class ScrubWorker {
   private lastScrubId: number | undefined;
   private readonly pending = new Map<
     number,
-    { resolve: (r: ScrubOutcome) => void; reject: (e: Error) => void }
+    { resolve: (outcome: ScrubOutcome) => void; reject: (error: Error) => void }
   >();
 
   onStage: ((stage: WorkerStage) => void) | undefined;
@@ -21,21 +21,22 @@ export class ScrubWorker {
   constructor() {
     this.worker = new Worker(new URL("./detect.worker.ts", import.meta.url), { type: "module" });
     this.worker.addEventListener("message", (event: MessageEvent<WorkerResponse>) => {
-      const msg = event.data;
-      if (msg.kind === "progress") {
-        this.onStage?.(msg.stage);
+      const response = event.data;
+      if (response.kind === "progress") {
+        this.onStage?.(response.stage);
         return;
       }
-      const entry = this.pending.get(msg.id);
-      if (!entry) return;
-      if (msg.kind === "result") {
-        this.pending.delete(msg.id);
-        entry.resolve(
-          msg.warning === undefined ? msg.result : { ...msg.result, warning: msg.warning },
-        );
-      } else if (msg.kind === "error") {
-        this.pending.delete(msg.id);
-        entry.reject(new Error(msg.message));
+      const pendingRequest = this.pending.get(response.id);
+      if (!pendingRequest) return;
+
+      if (response.kind === "result") {
+        this.pending.delete(response.id);
+        const outcome: ScrubOutcome = { ...response.result };
+        if (response.warning !== undefined) outcome.warning = response.warning;
+        pendingRequest.resolve(outcome);
+      } else if (response.kind === "error") {
+        this.pending.delete(response.id);
+        pendingRequest.reject(new Error(response.message));
       }
     });
   }
@@ -52,10 +53,10 @@ export class ScrubWorker {
    */
   cancel(): void {
     if (this.lastScrubId === undefined) return;
-    const prev = this.pending.get(this.lastScrubId);
+    const previousRequest = this.pending.get(this.lastScrubId);
     this.pending.delete(this.lastScrubId);
     this.lastScrubId = undefined;
-    prev?.reject(new Error("superseded"));
+    previousRequest?.reject(new Error("superseded"));
   }
 
   scrub(input: string, overrides?: ScrubOverrides): Promise<ScrubOutcome> {
@@ -72,7 +73,7 @@ export class ScrubWorker {
     this.worker.terminate();
   }
 
-  private post(msg: WorkerRequest): void {
-    this.worker.postMessage(msg);
+  private post(request: WorkerRequest): void {
+    this.worker.postMessage(request);
   }
 }

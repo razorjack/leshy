@@ -4,6 +4,7 @@ import mjsUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.mjs?url";
 import { Tokenizer } from "@huggingface/tokenizers";
 import userConfig from "../../leshy.config.ts";
 import type { Span } from "../core/types.ts";
+import type { ResolvedConfig } from "../core/config.ts";
 import { resolveConfig } from "../core/config.ts";
 import { scrub } from "../core/engine.ts";
 import { detectSemantic } from "../core/detect/semantic/detect.ts";
@@ -17,22 +18,22 @@ import type { WorkerRequest, WorkerResponse, WorkerStage } from "./protocol.ts";
 // service worker precaches them. JSEP build → WebGPU with a wasm fallback.
 ort.env.wasm.wasmPaths = { wasm: wasmUrl, mjs: mjsUrl };
 
-const base = resolveConfig(userConfig);
+const baseConfig = resolveConfig(userConfig);
 
 // The model is heavy (~180 MB): load it once, lazily, and share the promise.
 let glinerPromise: Promise<Gliner> | undefined;
 let glinerReady = false;
 
 const loadGliner = async (): Promise<Gliner> => {
-  const spec = models[base.semantic.model];
-  if (!spec) throw new Error(`unknown model '${base.semantic.model}'`);
-  const dir = `/models/${spec.id}`;
+  const model = models[baseConfig.semantic.model];
+  if (!model) throw new Error(`unknown model '${baseConfig.semantic.model}'`);
+  const modelDirectory = `/models/${model.id}`;
   const json = <T>(file: string): Promise<T> =>
-    fetch(`${dir}/${file}`).then((r) => r.json() as Promise<T>);
-  const [tok, tokCfg, weights] = await Promise.all([
-    json<ConstructorParameters<typeof Tokenizer>[0]>(spec.files.tokenizer),
-    json<ConstructorParameters<typeof Tokenizer>[1]>(spec.files.tokenizerConfig),
-    fetch(`${dir}/${spec.files.weights}`).then((r) => r.arrayBuffer()),
+    fetch(`${modelDirectory}/${file}`).then((response) => response.json() as Promise<T>);
+  const [tokenizerData, tokenizerConfig, weights] = await Promise.all([
+    json<ConstructorParameters<typeof Tokenizer>[0]>(model.files.tokenizer),
+    json<ConstructorParameters<typeof Tokenizer>[1]>(model.files.tokenizerConfig),
+    fetch(`${modelDirectory}/${model.files.weights}`).then((response) => response.arrayBuffer()),
   ]);
   const session = await ort.InferenceSession.create(weights, {
     executionProviders: ["webgpu", "wasm"],
@@ -42,54 +43,80 @@ const loadGliner = async (): Promise<Gliner> => {
   return new Gliner(
     session as unknown as OrtSession,
     makeTensor,
-    glinerTokenizer(new Tokenizer(tok, tokCfg), spec.tokenizerStyle),
-    { maxWidth: spec.maxWidth, clsTokenId: spec.clsTokenId },
+    glinerTokenizer(new Tokenizer(tokenizerData, tokenizerConfig), model.tokenizerStyle),
+    { maxWidth: model.maxWidth, clsTokenId: model.clsTokenId },
   );
 };
 
 const getGliner = (): Promise<Gliner> =>
   (glinerPromise ??= loadGliner().then(
-    (g) => {
+    (gliner) => {
       glinerReady = true;
-      return g;
+      return gliner;
     },
-    (e: unknown) => {
+    (error: unknown) => {
       // Forget the failure so the next scrub retries. Caching the rejected
       // promise would disable the model until the page reloads, even when the
       // cause was a cold cache or a dropped connection.
       glinerPromise = undefined;
-      throw e;
+      throw error;
     },
   ));
 
 type ScrubRequest = Extract<WorkerRequest, { kind: "scrub" }>;
 
-const post = (msg: WorkerResponse): void => self.postMessage(msg);
+const post = (response: WorkerResponse): void => self.postMessage(response);
 const progress = (id: number, stage: WorkerStage): void => post({ id, kind: "progress", stage });
-const fail = (id: number, e: unknown): void => post({ id, kind: "error", message: message(e) });
+const fail = (id: number, error: unknown): void =>
+  post({ id, kind: "error", message: message(error) });
 
-const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+const message = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
-const runScrub = async (msg: ScrubRequest): Promise<void> => {
-  const config = resolveConfig(userConfig, msg.overrides);
-  let semantic: ((input: string) => Promise<Span[]>) | undefined;
-  let warning: string | undefined;
-  if (config.semantic.enabled) {
-    if (!glinerReady) progress(msg.id, "loading-model");
-    try {
-      const gliner = await getGliner();
-      semantic = (input) =>
-        detectSemantic(input, config.detectors, gliner, config.semantic.threshold);
-    } catch (e: unknown) {
-      // Recall first: the rule-based layers still catch most of the fixture
-      // set, so a failed download (offline first launch, dropped connection)
-      // degrades detection instead of disabling it.
-      warning = `Model unavailable, names and addresses were not scanned (${message(e)})`;
-    }
+interface SemanticState {
+  semantic?: (input: string) => Promise<Span[]>;
+  warning?: string;
+}
+
+const prepareSemantic = async (
+  config: ResolvedConfig,
+  requestId: number,
+): Promise<SemanticState> => {
+  if (!config.semantic.enabled) return {};
+  if (!glinerReady) progress(requestId, "loading-model");
+
+  try {
+    const gliner = await getGliner();
+    return {
+      semantic: (input) =>
+        detectSemantic(input, config.detectors, gliner, config.semantic.threshold),
+    };
+  } catch (error: unknown) {
+    // Recall first: the rule-based layers still catch most of the fixture
+    // set, so a failed download (offline first launch, dropped connection)
+    // degrades detection instead of disabling it.
+    return {
+      warning: `Model unavailable, names and addresses were not scanned (${message(error)})`,
+    };
   }
-  progress(msg.id, "detecting");
-  const result = await scrub(msg.input, { config, semantic });
-  post({ id: msg.id, kind: "result", result, ...(warning === undefined ? {} : { warning }) });
+};
+
+const runScrub = async (request: ScrubRequest): Promise<void> => {
+  const config = resolveConfig(userConfig, request.overrides);
+  const semanticState = await prepareSemantic(config, request.id);
+
+  progress(request.id, "detecting");
+  const scrubResult = await scrub(request.input, { config, semantic: semanticState.semantic });
+  if (semanticState.warning === undefined) {
+    post({ id: request.id, kind: "result", result: scrubResult });
+  } else {
+    post({
+      id: request.id,
+      kind: "result",
+      result: scrubResult,
+      warning: semanticState.warning,
+    });
+  }
 };
 
 // The ONNX session is not reentrant, so scrubs run one at a time. While one is
@@ -103,9 +130,9 @@ const drain = async (): Promise<void> => {
   busy = true;
   try {
     while (queued) {
-      const job = queued;
+      const request = queued;
       queued = undefined;
-      await runScrub(job).catch((e: unknown) => fail(job.id, e));
+      await runScrub(request).catch((error: unknown) => fail(request.id, error));
     }
   } finally {
     busy = false;
@@ -113,16 +140,16 @@ const drain = async (): Promise<void> => {
 };
 
 self.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
-  const msg = event.data;
-  if (msg.kind === "warmup") {
+  const request = event.data;
+  if (request.kind === "warmup") {
     // Warmup never runs inference, so it is safe outside the scrub queue.
-    if (!glinerReady) progress(msg.id, "loading-model");
+    if (!glinerReady) progress(request.id, "loading-model");
     getGliner().then(
-      () => post({ id: msg.id, kind: "ready" }),
-      (e: unknown) => fail(msg.id, e),
+      () => post({ id: request.id, kind: "ready" }),
+      (error: unknown) => fail(request.id, error),
     );
     return;
   }
-  queued = msg;
+  queued = request;
   void drain();
 });

@@ -26,7 +26,7 @@ const spansOverlap = (
 };
 
 const greedySearch = (spans: RawSpan[], flatNer: boolean): RawSpan[] => {
-  const sorted = spans.slice().sort((a, b) => b[4] - a[4]);
+  const sorted = spans.slice().sort((left, right) => right[4] - left[4]);
   const selected: RawSpan[] = [];
   for (const span of sorted) {
     const hasOverlap = selected.some((existing) =>
@@ -34,8 +34,21 @@ const greedySearch = (spans: RawSpan[], flatNer: boolean): RawSpan[] => {
     );
     if (!hasOverlap) selected.push(span);
   }
-  return selected.sort((a, b) => a[1] - b[1]);
+  return selected.sort((left, right) => left[1] - right[1]);
 };
+
+interface DecodeOptions {
+  batchSize: number;
+  inputLength: number;
+  entityCount: number;
+  texts: string[];
+  charStartOffsets: number[][];
+  charEndOffsets: number[][];
+  idToClass: Record<number, string>;
+  modelOutput: ArrayLike<number>;
+  threshold?: number;
+  flatNer?: boolean;
+}
 
 /** Decoder for span-enumeration models. Logits shape: [batch, words, maxWidth, entities]. */
 export class SpanDecoder {
@@ -45,43 +58,43 @@ export class SpanDecoder {
     this.maxWidth = config.maxWidth;
   }
 
-  decode(
-    batchSize: number,
-    inputLength: number,
-    entityCount: number,
-    texts: string[],
-    charStartOffsets: number[][],
-    charEndOffsets: number[][],
-    idToClass: Record<number, string>,
-    modelOutput: ArrayLike<number>,
-    options: { threshold?: number; flatNer?: boolean } = {},
-  ): RawSpan[][] {
-    const threshold = options.threshold ?? DEFAULT_THRESHOLD;
-    const flatNer = options.flatNer ?? true;
+  decode({
+    batchSize,
+    inputLength,
+    entityCount,
+    texts,
+    charStartOffsets,
+    charEndOffsets,
+    idToClass,
+    modelOutput,
+    threshold = DEFAULT_THRESHOLD,
+    flatNer = true,
+  }: DecodeOptions): RawSpan[][] {
     const spans: RawSpan[][] = Array.from({ length: batchSize }, () => []);
     const batchStride = inputLength * this.maxWidth * entityCount;
     const tokenStride = this.maxWidth * entityCount;
     const widthStride = entityCount;
 
-    for (let idx = 0; idx < modelOutput.length; idx++) {
-      const prob = sigmoid(modelOutput[idx] ?? Number.NEGATIVE_INFINITY);
-      if (prob < threshold) continue;
-      const batchIdx = Math.floor(idx / batchStride);
-      const startToken = Math.floor(idx / tokenStride) % inputLength;
-      const endToken = startToken + (Math.floor(idx / widthStride) % this.maxWidth);
-      const entityIdx = idx % entityCount;
-      const starts = charStartOffsets[batchIdx];
-      const ends = charEndOffsets[batchIdx];
+    for (let outputIndex = 0; outputIndex < modelOutput.length; outputIndex++) {
+      const probability = sigmoid(modelOutput[outputIndex] ?? Number.NEGATIVE_INFINITY);
+      if (probability < threshold) continue;
+
+      const batchIndex = Math.floor(outputIndex / batchStride);
+      const startToken = Math.floor(outputIndex / tokenStride) % inputLength;
+      const endToken = startToken + (Math.floor(outputIndex / widthStride) % this.maxWidth);
+      const entityIndex = outputIndex % entityCount;
+      const starts = charStartOffsets[batchIndex];
+      const ends = charEndOffsets[batchIndex];
       if (!starts || !ends || startToken >= starts.length || endToken >= ends.length) continue;
-      const text = texts[batchIdx] ?? "";
+      const text = texts[batchIndex] ?? "";
       const startChar = starts[startToken] ?? 0;
       const endChar = ends[endToken] ?? 0;
-      spans[batchIdx]?.push([
+      spans[batchIndex]?.push([
         text.slice(startChar, endChar),
         startChar,
         endChar,
-        idToClass[entityIdx + ENTITY_ID_OFFSET] ?? "",
-        prob,
+        idToClass[entityIndex + ENTITY_ID_OFFSET] ?? "",
+        probability,
       ]);
     }
     return spans.map((batchSpans) => greedySearch(batchSpans, flatNer));

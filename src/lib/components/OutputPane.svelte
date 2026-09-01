@@ -13,16 +13,21 @@
   // A fake becomes a <TokenMark>; everything else is verbatim text (see splitOutput).
   const segments = $derived(splitOutput(session.output, session.replacements))
   const hasOutput = $derived(session.output.length > 0)
-  const original = (rep: Replacement): string =>
-    session.scrubbedFrom.slice(rep.sourceStart, rep.sourceEnd)
+  const original = (replacement: Replacement): string =>
+    session.scrubbedFrom.slice(replacement.sourceStart, replacement.sourceEnd)
 
   // A tally by entity type. On a long paste the marks scroll out of sight, so
   // this is the only place that says how much was replaced, and the quickest
   // way to notice a detector that over-fired.
   const byType = $derived.by(() => {
     const counts = new Map<string, number>()
-    for (const rep of session.replacements) counts.set(rep.type, (counts.get(rep.type) ?? 0) + 1)
-    return [...counts].sort(([a, na], [b, nb]) => nb - na || a.localeCompare(b))
+    for (const replacement of session.replacements) {
+      counts.set(replacement.type, (counts.get(replacement.type) ?? 0) + 1)
+    }
+    return [...counts].sort(
+      ([leftType, leftCount], [rightType, rightCount]) =>
+        rightCount - leftCount || leftType.localeCompare(rightType),
+    )
   })
   const total = $derived(session.replacements.length)
   const detail = $derived(byType.map(([type, n]) => `${n} ${type}`).join(', '))
@@ -32,8 +37,13 @@
   // when the marks have scrolled out of sight.
   let view = $state<'text' | 'table'>('text')
 
-  const mod = navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl+'
+  const modifierLabel = navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl+'
   const copy = (): void => void clipboard.copy(session.output)
+  const copyLabel = $derived.by(() => {
+    if (clipboard.state === 'copied') return 'Copied'
+    if (clipboard.state === 'failed') return 'Copy failed'
+    return 'Copy'
+  })
 </script>
 
 <section class="flex min-h-0 flex-col bg-background">
@@ -44,10 +54,10 @@
         <p class="flex min-w-0 items-center gap-2 truncate text-xs text-muted-foreground" title={summary}>
           {#if total > 0}
             <span><span class="font-medium text-foreground">{total}</span> replaced</span>
-            {#each byType as [type, n] (type)}
+            {#each byType as [type, count] (type)}
               <span class="{markClass(type)} inline-flex shrink-0 items-center gap-1">
                 <span class="size-2 rounded-full border border-mark-border bg-mark"></span>
-                {n} {type}
+                {count} {type}
               </span>
             {/each}
           {:else}
@@ -85,14 +95,10 @@
           variant="ghost"
           size="sm"
           class="-my-1 h-7 text-xs"
-          title="{mod}⇧C copies · {mod}⇧X copies and clears"
+          title="{modifierLabel}⇧C copies · {modifierLabel}⇧X copies and clears"
           onclick={copy}
         >
-          {clipboard.state === 'copied'
-            ? 'Copied'
-            : clipboard.state === 'failed'
-              ? 'Copy failed'
-              : 'Copy'}
+          {copyLabel}
         </Button>
       </div>
     {/if}
@@ -122,12 +128,12 @@
       <Tooltip.Provider delayDuration={200}>
         <!-- prettier-ignore -->
         <div class="whitespace-pre-wrap break-words"
-          >{#each segments as seg}{#if seg.kind === 'text'}{seg.text}{:else}<TokenMark
-                fake={seg.rep.fake}
-                label={seg.rep.label}
-                type={seg.rep.type}
-                original={original(seg.rep)}
-                onkeep={() => session.keep(original(seg.rep))}
+          >{#each segments as segment}{#if segment.kind === 'text'}{segment.text}{:else}<TokenMark
+                fake={segment.replacement.fake}
+                label={segment.replacement.label}
+                type={segment.replacement.type}
+                original={original(segment.replacement)}
+                onkeep={() => session.keep(original(segment.replacement))}
               />{/if}{/each}</div>
       </Tooltip.Provider>
     {:else if session.error}

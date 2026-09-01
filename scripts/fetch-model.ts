@@ -10,32 +10,32 @@ import { models, DEFAULT_MODEL } from "../src/core/detect/semantic/models.ts";
 //
 // Usage: npm run models:fetch [-- <model-id>]
 
-const id = process.argv[2] ?? DEFAULT_MODEL;
-const spec = models[id];
-if (!spec) {
-  console.error(`unknown model '${id}' — known: ${Object.keys(models).join(", ")}`);
+const modelId = process.argv[2] ?? DEFAULT_MODEL;
+const model = models[modelId];
+if (!model) {
+  console.error(`unknown model '${modelId}' — known: ${Object.keys(models).join(", ")}`);
   process.exit(1);
 }
 
-const destDir = path.join("public", "models", spec.id);
-mkdirSync(destDir, { recursive: true });
+const destinationDirectory = path.join("public", "models", model.id);
+mkdirSync(destinationDirectory, { recursive: true });
 
-for (const remote of spec.source.paths) {
-  const dest = path.join(destDir, path.basename(remote));
-  if (existsSync(dest) && statSync(dest).size > 0) {
-    console.log(`have  ${dest}`);
+for (const remotePath of model.source.paths) {
+  const destination = path.join(destinationDirectory, path.basename(remotePath));
+  if (existsSync(destination) && statSync(destination).size > 0) {
+    console.log(`have  ${destination}`);
     continue;
   }
-  const url = `https://huggingface.co/${spec.source.repo}/resolve/${spec.source.revision}/${remote}`;
+  const url = `https://huggingface.co/${model.source.repo}/resolve/${model.source.revision}/${remotePath}`;
   console.log(`fetch ${url}`);
-  const res = await fetch(url);
-  if (!res.ok || !res.body) {
-    console.error(`  failed: ${res.status} ${res.statusText}`);
+  const response = await fetch(url);
+  if (!response.ok || !response.body) {
+    console.error(`  failed: ${response.status} ${response.statusText}`);
     process.exit(1);
   }
   await pipeline(
-    Readable.fromWeb(res.body as import("node:stream/web").ReadableStream),
-    createWriteStream(dest),
+    Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
+    createWriteStream(destination),
   );
-  console.log(`wrote ${dest} (${(statSync(dest).size / 1e6).toFixed(1)} MB)`);
+  console.log(`wrote ${destination} (${(statSync(destination).size / 1e6).toFixed(1)} MB)`);
 }

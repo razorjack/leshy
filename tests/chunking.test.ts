@@ -10,13 +10,19 @@ import type { GlinerEntity } from "../src/core/detect/semantic/gliner/types.ts";
 const TARGETS = ["Zorluk", "Duplicaty", "Mikvane", "Perrundle", "Jan Kowalski"];
 const mockGliner = {
   extractEntities: (text: string): Promise<GlinerEntity[]> => {
-    const ents: GlinerEntity[] = [];
-    for (const t of TARGETS) {
-      for (let i = text.indexOf(t); i >= 0; i = text.indexOf(t, i + 1)) {
-        ents.push({ text: t, start: i, end: i + t.length, label: "person", score: 0.9 });
+    const entities: GlinerEntity[] = [];
+    for (const target of TARGETS) {
+      for (let start = text.indexOf(target); start >= 0; start = text.indexOf(target, start + 1)) {
+        entities.push({
+          text: target,
+          start,
+          end: start + target.length,
+          label: "person",
+          score: 0.9,
+        });
       }
     }
-    return Promise.resolve(ents);
+    return Promise.resolve(entities);
   },
 } as unknown as Gliner;
 
@@ -34,16 +40,16 @@ describe("semantic chunking", () => {
     const input = words.join(" ");
 
     const spans = await detectSemantic(input, detectors, mockGliner, 0.35);
-    const texts = spans.map((s) => s.text);
+    const texts = spans.map((span) => span.text);
 
     for (const name of ["Zorluk", "Duplicaty", "Mikvane", "Perrundle", "Jan Kowalski"]) {
       expect(texts).toContain(name);
     }
     // Duplicaty is in two windows but must appear once (deduped)
-    expect(texts.filter((t) => t === "Duplicaty")).toHaveLength(1);
+    expect(texts.filter((text) => text === "Duplicaty")).toHaveLength(1);
     expect(spans).toHaveLength(5);
     // every remapped offset points at exactly its text in the full input
-    for (const s of spans) expect(input.slice(s.start, s.end)).toBe(s.text);
+    for (const span of spans) expect(input.slice(span.start, span.end)).toBe(span.text);
   });
 
   it("counts words the way the model does, so minified JSON is windowed too", async () => {
@@ -65,7 +71,7 @@ describe("semantic chunking", () => {
     const spans = await detectSemantic(input, detectors, counting, 0.35);
     expect(seen.length).toBeGreaterThan(1);
     expect(Math.max(...seen)).toBeLessThan(input.length);
-    expect(spans.map((s) => s.text).sort()).toEqual(["Perrundle", "Zorluk"]);
+    expect(spans.map((span) => span.text).sort()).toEqual(["Perrundle", "Zorluk"]);
   });
 
   it("handles a short input as a single window", async () => {

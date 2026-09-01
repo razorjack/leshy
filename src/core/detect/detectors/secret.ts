@@ -18,15 +18,15 @@ type Hit = Pick<Span, "start" | "end" | "text">;
 const LITERAL = /^(?:null|nil|true|false|undefined|none|\*+|x+|redacted|hidden)$/i;
 
 /** Spans the last capture group, which every pattern here ends on. */
-const tail = (input: string, re: RegExp): Hit[] => {
-  const out: Hit[] = [];
-  for (const m of input.matchAll(re)) {
-    const text = m[m.length - 1];
+const tail = (input: string, pattern: RegExp): Hit[] => {
+  const hits: Hit[] = [];
+  for (const match of input.matchAll(pattern)) {
+    const text = match[match.length - 1];
     if (text === undefined || text === "" || LITERAL.test(text)) continue;
-    const end = m.index + m[0].length;
-    out.push({ start: end - text.length, end, text });
+    const end = match.index + match[0].length;
+    hits.push({ start: end - text.length, end, text });
   }
-  return out;
+  return hits;
 };
 
 export const password: KeyDetector = {
@@ -94,21 +94,21 @@ export const cookie: CustomDetector = {
   kind: "custom",
   enabled: true,
   match: (input) => {
-    const out: Hit[] = [];
+    const hits: Hit[] = [];
     for (const header of input.matchAll(COOKIE_HEADER)) {
-      const value = header[1];
-      if (value === undefined) continue;
-      const base = header.index + header[0].length - value.length;
-      for (const pair of value.matchAll(COOKIE_PAIR)) {
-        const [, name, raw] = pair;
-        if (name === undefined || raw === undefined || COOKIE_ATTR.test(name)) continue;
-        const text = raw.trimEnd();
+      const headerValue = header[1];
+      if (headerValue === undefined) continue;
+      const valueStart = header.index + header[0].length - headerValue.length;
+      for (const pair of headerValue.matchAll(COOKIE_PAIR)) {
+        const [, name, sourceValue] = pair;
+        if (name === undefined || sourceValue === undefined || COOKIE_ATTR.test(name)) continue;
+        const text = sourceValue.trimEnd();
         if (text === "" || LITERAL.test(text)) continue;
-        const start = base + pair.index + name.length + 1;
-        out.push({ start, end: start + text.length, text });
+        const start = valueStart + pair.index + name.length + 1;
+        hits.push({ start, end: start + text.length, text });
       }
     }
-    return out;
+    return hits;
   },
   generate: generators.secret,
 };
@@ -172,20 +172,20 @@ export const privateKey: CustomDetector = {
   kind: "custom",
   enabled: true,
   match: (input) => {
-    const out: Hit[] = [];
+    const hits: Hit[] = [];
     for (const block of input.matchAll(PEM)) {
       const body = block[2];
       if (body === undefined) continue;
-      const base = block.index + (block[1]?.length ?? 0);
+      const bodyStart = block.index + (block[1]?.length ?? 0);
       for (const line of body.matchAll(PEM_BODY)) {
-        out.push({
-          start: base + line.index,
-          end: base + line.index + line[0].length,
+        hits.push({
+          start: bodyStart + line.index,
+          end: bodyStart + line.index + line[0].length,
           text: line[0],
         });
       }
     }
-    return out;
+    return hits;
   },
   generate: generators.secret,
 };

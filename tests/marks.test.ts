@@ -4,7 +4,9 @@ import { resolveConfig } from "../src/core/config.ts";
 
 describe("mark groups", () => {
   it("every built-in type has a group of its own", () => {
-    for (const d of resolveConfig().detectors) expect(markGroup(d.type)).not.toBe("other");
+    for (const detector of resolveConfig().detectors) {
+      expect(markGroup(detector.type)).not.toBe("other");
+    }
   });
 
   it("custom types fall back to the neutral mark", () => {

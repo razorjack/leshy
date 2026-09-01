@@ -11,11 +11,11 @@
     tabulate(session.scrubbedFrom, session.replacements, { filter, sortBy, descending }),
   )
 
-  const sort = (col: Column): void => {
-    if (sortBy === col) descending = !descending
+  const sort = (column: Column): void => {
+    if (sortBy === column) descending = !descending
     else {
-      sortBy = col
-      descending = col === 'count'
+      sortBy = column
+      descending = column === 'count'
     }
   }
 
@@ -26,7 +26,10 @@
     ['count', 'Count'],
   ]
 
-  const arrow = (col: Column): string => (sortBy === col ? (descending ? ' ↓' : ' ↑') : '')
+  const arrow = (column: Column): string => {
+    if (sortBy !== column) return ''
+    return descending ? ' ↓' : ' ↑'
+  }
   const keep = (row: Row): void => session.keep(row.original)
 </script>
 
@@ -38,16 +41,16 @@
     value={filter}
     spellcheck="false"
     autocomplete="off"
-    oninput={(e) => (filter = e.currentTarget.value)}
+    oninput={(event) => (filter = event.currentTarget.value)}
   />
   <div class="min-h-0 flex-1 overflow-auto">
     <table class="w-full border-collapse text-left text-sm">
       <thead class="sticky top-0 bg-background font-sans text-xs text-muted-foreground">
         <tr>
-          {#each columns as [col, title] (col)}
+          {#each columns as [column, title] (column)}
             <th class="border-b border-border py-1.5 pr-4 font-medium">
-              <button type="button" class="hover:text-foreground" onclick={() => sort(col)}>
-                {title}{arrow(col)}
+              <button type="button" class="hover:text-foreground" onclick={() => sort(column)}>
+                {title}{arrow(column)}
               </button>
             </th>
           {/each}

@@ -2,11 +2,11 @@ import type { Generate, StructuralDetector } from "../../types.ts";
 import { fakerFor } from "../../generate/faker.ts";
 import { pad } from "../../generate/shape.ts";
 
-const generate: Generate = (ctx) => {
-  const f = fakerFor(ctx.seed, "en");
-  let area = f.number.int({ min: 1, max: 899 });
+const generate: Generate = (context) => {
+  const faker = fakerFor(context.seed, "en");
+  let area = faker.number.int({ min: 1, max: 899 });
   if (area === 666) area = 665;
-  const serial = f.number.int({ min: 1, max: 9999 });
+  const serial = faker.number.int({ min: 1, max: 9999 });
   // Group "00" is never issued — Leshy's SSN fake namespace.
   return `${pad(area, 3)}-00-${pad(serial, 4)}`;
 };

@@ -13,14 +13,18 @@ import { models } from "../../src/core/detect/semantic/models.ts";
  * is runtime-independent, so this validates the browser path's detection.
  */
 export const loadGlinerNode = async (modelId: string): Promise<Gliner> => {
-  const spec = models[modelId];
-  if (!spec) throw new Error(`unknown model '${modelId}'`);
-  const dir = path.join("public", "models", spec.id);
+  const model = models[modelId];
+  if (!model) throw new Error(`unknown model '${modelId}'`);
+  const modelDirectory = path.join("public", "models", model.id);
 
-  const read = <T>(file: string): T => JSON.parse(readFileSync(path.join(dir, file), "utf8")) as T;
-  const tokenizer = new Tokenizer(read(spec.files.tokenizer), read(spec.files.tokenizerConfig));
+  const readJson = <T>(file: string): T =>
+    JSON.parse(readFileSync(path.join(modelDirectory, file), "utf8")) as T;
+  const tokenizer = new Tokenizer(
+    readJson(model.files.tokenizer),
+    readJson(model.files.tokenizerConfig),
+  );
 
-  const session = await ort.InferenceSession.create(path.join(dir, spec.files.weights));
+  const session = await ort.InferenceSession.create(path.join(modelDirectory, model.files.weights));
   const makeTensor: MakeTensor = (kind, data, dims) =>
     new ort.Tensor(kind, data as unknown as bigint[], dims);
 
@@ -29,7 +33,7 @@ export const loadGlinerNode = async (modelId: string): Promise<Gliner> => {
   return new Gliner(
     session as unknown as OrtSession,
     makeTensor,
-    glinerTokenizer(tokenizer, spec.tokenizerStyle),
-    { maxWidth: spec.maxWidth, clsTokenId: spec.clsTokenId },
+    glinerTokenizer(tokenizer, model.tokenizerStyle),
+    { maxWidth: model.maxWidth, clsTokenId: model.clsTokenId },
   );
 };

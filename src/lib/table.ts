@@ -22,26 +22,39 @@ export interface View {
  */
 export const tabulate = (input: string, replacements: Replacement[], view: View): Row[] => {
   const rows = new Map<string, Row>();
-  for (const rep of replacements) {
-    const original = input.slice(rep.sourceStart, rep.sourceEnd);
-    const key = `${original}\0${rep.fake}\0${rep.type}`;
+  for (const replacement of replacements) {
+    const original = input.slice(replacement.sourceStart, replacement.sourceEnd);
+    const key = `${original}\0${replacement.fake}\0${replacement.type}`;
     const row = rows.get(key);
-    if (row) row.count++;
-    else rows.set(key, { original, fake: rep.fake, type: rep.type, label: rep.label, count: 1 });
+    if (row) {
+      row.count++;
+    } else {
+      rows.set(key, {
+        original,
+        fake: replacement.fake,
+        type: replacement.type,
+        label: replacement.label,
+        count: 1,
+      });
+    }
   }
   const needle = view.filter.trim().toLowerCase();
-  const out = [...rows.values()].filter(
-    (r) =>
+  const filteredRows = [...rows.values()].filter(
+    (row) =>
       needle === "" ||
-      [r.original, r.fake, r.label, r.type].some((s) => s.toLowerCase().includes(needle)),
+      [row.original, row.fake, row.label, row.type].some((field) =>
+        field.toLowerCase().includes(needle),
+      ),
   );
-  const dir = view.descending ? -1 : 1;
-  const col = view.sortBy;
-  return out.sort((a, b) => {
-    const cmp =
-      col === "count"
-        ? a.count - b.count
-        : a[col].localeCompare(b[col], undefined, { numeric: true });
-    return dir * cmp || a.original.localeCompare(b.original);
+  const direction = view.descending ? -1 : 1;
+  const column = view.sortBy;
+  return filteredRows.sort((left, right) => {
+    let comparison: number;
+    if (column === "count") {
+      comparison = left.count - right.count;
+    } else {
+      comparison = left[column].localeCompare(right[column], undefined, { numeric: true });
+    }
+    return direction * comparison || left.original.localeCompare(right.original);
   });
 };

@@ -18,8 +18,8 @@ const GROUPS: Record<MarkGroup, EntityType[]> = {
 };
 
 const byType = new Map<EntityType, MarkGroup>(
-  (Object.entries(GROUPS) as Array<[MarkGroup, EntityType[]]>).flatMap(([g, types]) =>
-    types.map((t) => [t, g]),
+  (Object.entries(GROUPS) as Array<[MarkGroup, EntityType[]]>).flatMap(([group, types]) =>
+    types.map((type) => [type, group]),
   ),
 );
 

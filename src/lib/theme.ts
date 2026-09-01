@@ -14,6 +14,12 @@ const metaTag = (): Element | null => document.querySelector('meta[name="theme-c
 
 const other = (theme: Theme): Theme => (theme === "dark" ? "light" : "dark");
 
+const nextThemeSetting = (setting: ThemeSetting, systemTheme: Theme): ThemeSetting => {
+  if (setting === "system") return other(systemTheme);
+  if (setting === systemTheme) return "system";
+  return other(setting);
+};
+
 const applyTheme = (theme: Theme): void => {
   document.documentElement.classList.toggle("dark", theme === "dark");
   metaTag()?.setAttribute("content", THEME_COLOR[theme]);
@@ -41,9 +47,8 @@ export const setTheme = (setting: ThemeSetting): void => {
  */
 export const cycleTheme = (): ThemeSetting => {
   const setting = themeSetting();
-  const system = resolve("system");
-  const next: ThemeSetting =
-    setting === "system" ? other(system) : setting === system ? "system" : other(setting);
+  const systemTheme = resolve("system");
+  const next = nextThemeSetting(setting, systemTheme);
   setTheme(next);
   return next;
 };

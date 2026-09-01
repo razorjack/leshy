@@ -4,7 +4,7 @@ import { session } from "../src/state/session.svelte.ts";
 import OutputPane from "../src/lib/components/OutputPane.svelte";
 import type { Replacement } from "../src/core/types.ts";
 
-const rep = (start: number, end: number, fake: string): Replacement => ({
+const replacement = (start: number, end: number, fake: string): Replacement => ({
   start,
   end,
   sourceStart: 0,
@@ -23,13 +23,13 @@ const visibleText = (): string =>
 describe("OutputPane render", () => {
   it("renders marks inline with no stray whitespace around them", () => {
     session.output = 'a "Bob" z';
-    session.replacements = [rep(3, 6, "Bob")];
+    session.replacements = [replacement(3, 6, "Bob")];
     expect(visibleText()).toContain('a "Bob" z');
   });
 
   it("keeps multi-byte output aligned", () => {
     session.output = "cześć Łukasz!";
-    session.replacements = [rep(6, 12, "Łukasz")];
+    session.replacements = [replacement(6, 12, "Łukasz")];
     expect(visibleText()).toContain("cześć Łukasz!");
   });
 

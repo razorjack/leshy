@@ -8,17 +8,17 @@ class Clipboard {
   private timer: ReturnType<typeof setTimeout> | undefined;
 
   async copy(text: string): Promise<boolean> {
-    let ok: boolean;
+    let copied: boolean;
     try {
       await navigator.clipboard.writeText(text);
-      ok = true;
+      copied = true;
     } catch {
-      ok = false;
+      copied = false;
     }
-    this.state = ok ? "copied" : "failed";
+    this.state = copied ? "copied" : "failed";
     clearTimeout(this.timer);
     this.timer = setTimeout(() => (this.state = "idle"), 1600);
-    return ok;
+    return copied;
   }
 }
 

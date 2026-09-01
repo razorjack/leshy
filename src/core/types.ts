@@ -109,11 +109,11 @@ export interface GenerateContext {
 }
 
 /**
- * Produces the replacement for a matched value. Must be deterministic in ctx
- * (same ctx ⇒ same output), must preserve the entity's format, and must not
+ * Produces the replacement for a matched value. Must be deterministic in context
+ * (same context ⇒ same output), must preserve the entity's format, and must not
  * contain quotes, backslashes or newlines (the engine rejects and reseeds).
  */
-export type Generate = (ctx: GenerateContext) => string;
+export type Generate = (context: GenerateContext) => string;
 
 export interface DetectorBase {
   /** Short unambiguous id, e.g. 'email', 'pesel'. */
