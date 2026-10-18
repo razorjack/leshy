@@ -100,6 +100,9 @@ const createWindow = (): BrowserWindow => {
     minHeight: 420,
     icon,
     backgroundColor: background(),
+    // Linux draws the default menu inside the window; macOS keeps it in the
+    // global bar. Hiding it keeps the accelerators, and Alt still shows it.
+    autoHideMenuBar: true,
     show: false,
     webPreferences: {
       contextIsolation: true,
