@@ -128,7 +128,7 @@ const SMOKE = `(async () => {
   return {
     origin: location.origin,
     crossOriginIsolated,
-    webgpu: 'gpu' in navigator,
+    webgpu: 'gpu' in navigator && (await navigator.gpu.requestAdapter()) !== null,
     workers: typeof Worker === 'function',
     subtle: !!crypto.subtle,
     weights: await head('/models/gliner-x-small/model_quantized.onnx'),
