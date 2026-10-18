@@ -23,7 +23,8 @@ mac:
 linux:
   category: Development
   icon: assets/brand/leshy-app-icon-dark-1024.png
-  # Without this the desktop environment cannot link the running window to the
-  # launcher entry (the .desktop name then follows executableName).
+  # Electron takes the window's app_id / WM_CLASS from desktopName in
+  # package.json. Syncing names the .desktop file and its StartupWMClass after
+  # it too, so the desktop environment can link the window to the launcher.
   syncDesktopName: true
   target: [AppImage]

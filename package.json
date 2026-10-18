@@ -63,5 +63,6 @@
     "electron": true,
     "onnxruntime-node": true,
     "protobufjs": true
-  }
+  },
+  "desktopName": "leshy.desktop"
 }
