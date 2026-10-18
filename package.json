@@ -19,6 +19,7 @@
     "desktop": "npm run desktop:build && electron .",
     "desktop:pack": "npm run desktop:build && electron-builder --dir",
     "desktop:dist": "npm run desktop:build && electron-builder",
+    "desktop:install": "npm run desktop:pack && node scripts/linux-install.ts",
     "models:fetch": "node scripts/fetch-model.ts",
     "icons": "node scripts/icons.ts",
     "icons:macos": "node scripts/macos-icon.ts",

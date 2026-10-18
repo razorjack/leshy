@@ -66,12 +66,14 @@ npm run dev
 ### Desktop app
 
 ```
-npm run desktop        # build the shell and launch it
-npm run desktop:pack   # release/mac-arm64/Leshy.app, drag it to /Applications
-npm run desktop:dist   # .dmg on macOS, .AppImage on Linux
+npm run desktop          # build the shell and launch it
+npm run desktop:pack     # macOS: release/mac-arm64/Leshy.app, drag it to /Applications
+npm run desktop:install  # Linux: install for the current user, with a launcher entry
+npm run desktop:dist     # .dmg on macOS, .AppImage on Linux
 ```
 
-Linux builds cross-compile from macOS: `npx electron-builder --linux AppImage --x64`.
+`node scripts/linux-install.ts --remove` uninstalls the Linux copy. Linux builds also
+cross-compile from macOS: `npx electron-builder --linux AppImage --x64`.
 See [docs/adr/0007](docs/adr/0007-desktop-shell.md).
 
 ## Development
