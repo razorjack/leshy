@@ -33,7 +33,14 @@
     const all = base.detectors
     const disable = all.filter((d) => defaults[d.id] && !enabled[d.id]).map((d) => d.id)
     const enable = all.filter((d) => !defaults[d.id] && enabled[d.id]).map((d) => d.id)
-    const saved = { disable, enable, countries, locale, semanticEnabled: semantic }
+    // The overrides cross postMessage, which cannot clone a $state proxy.
+    const saved = {
+      disable,
+      enable,
+      countries: $state.snapshot(countries),
+      locale,
+      semanticEnabled: semantic,
+    }
     session.setOverrides({ ...saved, ...(salt ? { salt } : {}) })
     localStorage.setItem(OVERRIDES_KEY, JSON.stringify(saved))
     if (salt) localStorage.setItem(SALT_KEY, salt)
