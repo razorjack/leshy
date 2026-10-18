@@ -31,7 +31,9 @@ once. A packaged desktop app removes the dev server without changing the app.
 - **`asar: false`.** 180 MB of ONNX weights do not belong in an archive, and a local
   build gains nothing from one.
 - **electron-builder** produces a macOS `.dmg` and a Linux `AppImage`; `--dir` gives the
-  plain `.app` / app tree, which is what a local install actually needs.
+  plain `.app` / app tree, which is what a local install actually needs. On Linux,
+  `npm run desktop:install` copies that tree under `$XDG_DATA_HOME` and registers a
+  launcher entry, the counterpart of dragging `Leshy.app` into `/Applications`.
 - The main process is TypeScript compiled by `tsc` (`tsconfig.electron.json`) into
   `electron/out/`. No bundler, no new toolchain; `npm run check` type-checks it.
 
@@ -52,6 +54,20 @@ preserved, email replaced under `.example`, name, phone, address and PESEL faked
 Sizes: `Leshy.app` 496 MB, `.dmg` 265 MB, Linux tree 532 MB, AppImage 274 MB. 220 MB of that is
 `dist/`, dominated by the weights and the 26 MB ORT wasm.
 
+On Linux (Fedora 44, KDE Plasma on Wayland, NVIDIA RTX 3070 Ti with the proprietary
+driver) the shell runs natively on Wayland from source, from the `--dir` tree, from the
+AppImage, and from the `desktop:install` copy. The smoke report matches macOS except for
+`"webgpu":false`: Chromium exposes `navigator.gpu` but returns no adapter, so ORT drops
+the WebGPU execution provider and runs threaded WASM. The `e2e/smoke.spec.ts` sample
+scrubs in about 3 s from a cold start, and a 6.4 KB log in about 3.5 s. Chrome 152
+running the PWA on the same machine has no adapter either and takes about 4.6 s for the
+same log.
+
+`--enable-unsafe-webgpu --enable-features=Vulkan` produces only a SwiftShader adapter,
+because the GPU process sandbox cannot load the Vulkan drivers, on Wayland and on X11.
+SwiftShader was 3 to 6 times slower than WASM, so the shell sets no GPU flags. Reaching
+the real GPU would take `--disable-gpu-sandbox`.
+
 ## Gotchas
 
 1. **`allowScripts` needs `"electron": true`** or npm blocks the postinstall that
@@ -68,9 +84,27 @@ Sizes: `Leshy.app` 496 MB, `.dmg` 265 MB, Linux tree 532 MB, AppImage 274 MB. 22
    separate notarization step.
 5. **Linux builds cross-compile from macOS.** `--linux dir` and `--linux AppImage --x64`
    both work without Docker; electron-builder downloads the Linux runtime and AppImage
-   tooling on demand.
+   tooling on demand. Native Linux builds need nothing beyond `npm install`.
 6. The CSP lives in two places now, `index.html` and `electron/main.ts`. Keep them
    identical.
+7. **Linux window integration.** Electron takes the Wayland `app_id` (X11 `WM_CLASS`)
+   from `desktopName` in package.json, and `syncDesktopName` gives the `.desktop` file
+   and its `StartupWMClass` the same name. Without `desktopName`, electron-builder writes
+   `StartupWMClass=Leshy` for a window whose `app_id` is `leshy`. Electron draws its
+   default menu inside the window on Linux, so the window sets `autoHideMenuBar`; Alt
+   still shows it.
+8. **Sandbox on Linux.** electron-builder's default AppImage `Exec` line passes
+   `--no-sandbox`. `appImage.executableArgs: []` removes it; AppRun still adds the flag
+   itself when `unshare -Ur true` fails. The `--dir` tree and the `desktop:install` copy
+   ship `chrome-sandbox` without the SUID bit, so the sandbox depends on unprivileged
+   user namespaces. Fedora allows them; Ubuntu 24.04 and later restrict them through
+   AppArmor.
+9. **Wayland clipboard.** Chromium sets the clipboard selection only with the serial of
+   a real key or pointer press. A click dispatched over CDP shows "Copied" without
+   reaching the system clipboard, so Copy has to be checked by hand.
+10. **`ELECTRON_RUN_AS_NODE`.** A terminal hosted inside an Electron app can export it.
+    `electron .` then runs `main.js` as plain Node and fails with "does not provide an
+    export named 'BrowserWindow'". Unset it before launching.
 
 ## Alternatives rejected
 
