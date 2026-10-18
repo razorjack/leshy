@@ -28,3 +28,8 @@ linux:
   # it too, so the desktop environment can link the window to the launcher.
   syncDesktopName: true
   target: [AppImage]
+appImage:
+  # electron-builder's default Exec line passes --no-sandbox, so a launcher
+  # entry would run the renderer unsandboxed everywhere. AppRun already adds the
+  # flag itself when user namespaces are unavailable.
+  executableArgs: []
